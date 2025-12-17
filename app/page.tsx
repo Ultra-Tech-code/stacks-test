@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useWallet } from './context/WalletContext';
 import EventMonitor from './components/EventMonitor';
+import Link from 'next/link';
 
 export default function Home() {
   const { address, isConnected, connectWallet, disconnectWallet, callSetValue, callGetValue, callTestEventTypes, callTestEmitEvent, loading, error, success, clearMessages } = useWallet();
@@ -30,6 +31,16 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4">
       <main className="max-w-4xl mx-auto">
+        {/* Navigation */}
+        <div className="mb-6">
+          <Link 
+            href="/voting" 
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors"
+          >
+            🗳️ Go to Voting DApp
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Stacks Contract Interaction</h1>
