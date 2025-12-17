@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVoting } from '../context/VotingContext';
 import { useWallet } from '../context/WalletContext';
+import { useStacksWebSocket } from '../hooks/useStacksWebSocket';
 
 interface Poll {
   pollId: number;
@@ -15,6 +16,9 @@ interface Poll {
   isActive: boolean;
 }
 
+const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
+const CONTRACT_NAME = 'Blackadam-vote-contract';
+
 export default function VotingDApp() {
   const { isConnected, address } = useWallet();
   const { createPoll, vote, endPoll, loading, error, success, clearMessages } = useVoting();
@@ -22,11 +26,36 @@ export default function VotingDApp() {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [pollCount, setPollCount] = useState(0);
   const [loadingPolls, setLoadingPolls] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const [realtimeEvents, setRealtimeEvents] = useState<string[]>([]);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Cache duration: 30 seconds
+  const CACHE_DURATION = 30000;
   
   // Create poll form
   const [newPollTitle, setNewPollTitle] = useState('');
   const [newPollDescription, setNewPollDescription] = useState('');
   const [pollDurationDays, setPollDurationDays] = useState('1'); // Duration in days
+
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, error: wsError } = useStacksWebSocket({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    onEvent: (event) => {
+      console.log('Real-time event:', event);
+      
+      // Add event to realtime feed
+      setRealtimeEvents(prev => [
+        `${new Date().toLocaleTimeString()}: ${event.event} - TX: ${event.txId.slice(0, 8)}...`,
+        ...prev.slice(0, 9) // Keep last 10 events
+      ]);
+      
+      // Auto-refresh polls when contract events occur
+      loadPolls(true);
+    },
+    autoConnect: isConnected
+  });
 
   // Fetch poll count
   const fetchPollCount = async () => {
@@ -110,20 +139,41 @@ export default function VotingDApp() {
     return match ? match[1] : '';
   };
 
-  // Load all polls
-  const loadPolls = async () => {
+  // Load all polls with caching and debouncing
+  const loadPolls = useCallback(async (forceRefresh = false) => {
+    // Check if we need to refresh (cache expired or forced)
+    const now = Date.now();
+    if (!forceRefresh && now - lastFetchTime < CACHE_DURATION) {
+      console.log('Using cached poll data');
+      return;
+    }
+
+    // Clear any pending fetch
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
     setLoadingPolls(true);
     const count = await fetchPollCount();
-    const pollPromises = [];
     
+    // Batch fetch polls with delay to avoid rate limit
+    const pollPromises = [];
     for (let i = 0; i < count; i++) {
-      pollPromises.push(fetchPoll(i));
+      pollPromises.push(
+        new Promise<Poll | null>((resolve) => {
+          // Stagger requests by 100ms each to avoid rate limit
+          setTimeout(() => {
+            fetchPoll(i).then(resolve);
+          }, i * 100);
+        })
+      );
     }
     
     const fetchedPolls = await Promise.all(pollPromises);
     setPolls(fetchedPolls.filter((p): p is Poll => p !== null).reverse());
     setLoadingPolls(false);
-  };
+    setLastFetchTime(now);
+  }, [lastFetchTime, CACHE_DURATION]);
 
   useEffect(() => {
     if (isConnected) {
@@ -149,21 +199,18 @@ export default function VotingDApp() {
     setNewPollTitle('');
     setNewPollDescription('');
     
-    // Refresh polls after creation
-    setTimeout(() => loadPolls(), 3000);
+    // WebSocket will auto-refresh when event comes through
   };
 
   const handleVote = async (pollId: number, voteYes: boolean) => {
     await vote(pollId, voteYes);
-    
-    // Refresh polls after voting
-    setTimeout(() => loadPolls(), 3000);
+    // WebSocket will auto-refresh when event comes through
   };
 
   const handleEndPoll = async (pollId: number) => {
     if (confirm('Are you sure you want to end this poll?')) {
       await endPoll(pollId);
-      setTimeout(() => loadPolls(), 3000);
+      // WebSocket will auto-refresh when event comes through
     }
   };
 
@@ -187,6 +234,32 @@ export default function VotingDApp() {
 
   return (
     <div className="space-y-8">
+      {/* WebSocket Status */}
+      <div className={`px-4 py-2 rounded text-sm ${
+        wsConnected 
+          ? 'bg-green-50 dark:bg-green-900 text-green-800 dark:text-green-100' 
+          : 'bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100'
+      }`}>
+        {wsConnected ? '🟢 Live updates connected' : '🟡 Connecting to live updates...'}
+        {wsError && <span className="ml-2 text-xs">({wsError})</span>}
+      </div>
+
+      {/* Real-time Events Feed */}
+      {realtimeEvents.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+            📡 Real-time Events
+          </h3>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {realtimeEvents.map((event, i) => (
+              <p key={i} className="text-xs text-blue-800 dark:text-blue-200 font-mono">
+                {event}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-100 px-4 py-3 rounded relative">
@@ -228,6 +301,14 @@ export default function VotingDApp() {
               Description
             </label>
             <textarea
+              value={newPollDescription}
+              onChange={(e) => setNewPollDescription(e.target.value)}
+              maxLength={1024}
+              rows={3}
+              placeholder="Enter poll description..."
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Duration (days)
@@ -243,14 +324,6 @@ export default function VotingDApp() {
             />
             <p className="text-xs text-gray-500 mt-1">
               1 day = 144 blocks | 7 days = 1008 blocks | 0.1 days ≈ 14 blocks (~2.4 hours)
-            </p>
-          </div>Change={(e) => setPollDuration(e.target.value)}
-              min="1"
-              placeholder="144"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              144 blocks ≈ 1 day | 1008 blocks ≈ 1 week
             </p>
           </div>
           <button
@@ -269,13 +342,20 @@ export default function VotingDApp() {
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
             🗳️ Active Polls ({pollCount})
           </h2>
-          <button
-            onClick={loadPolls}
-            disabled={loadingPolls}
-            className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded transition-colors"
-          >
-            🔄 Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {lastFetchTime > 0 && (
+              <span className="text-xs text-gray-500">
+                Last updated: {new Date(lastFetchTime).toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={() => loadPolls(true)}
+              disabled={loadingPolls}
+              className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded transition-colors"
+            >
+              {loadingPolls ? '⏳ Loading...' : '🔄 Refresh'}
+            </button>
+          </div>
         </div>
 
         {loadingPolls ? (
