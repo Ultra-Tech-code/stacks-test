@@ -1,15 +1,18 @@
-# Stacks DApp Frontend
+# Stacks Voting DApp
 
-A Next.js web application for interacting with Stacks smart contracts on the Stacks Testnet. This DApp provides a user-friendly interface to connect your Stacks wallet and interact with deployed smart contracts.
+A decentralized voting application built with Next.js that interacts with a Clarity smart contract on the Stacks Testnet. This DApp enables users to create polls, cast votes, and view results in real-time using WebSocket updates.
 
 ## 🌟 Features
 
 - **Wallet Integration**: Connect with Leather or Xverse wallet extensions
-- **Contract Interactions**: Call smart contract functions directly from the UI
-- **Key-Value Storage**: Store and retrieve data using the contract's map functionality
-- **Event Testing**: Test contract events including token minting, NFT operations, and STX transfers
+- **Poll Creation**: Create on-chain polls with customizable duration
+- **Voting System**: Cast Yes/No votes on active polls
+- **Real-time Updates**: WebSocket integration for live poll updates
+- **Vote Tracking**: Automatic detection of user's voting history from on-chain data
+- **Poll Management**: Poll creators can end their polls early
+- **Vote Analytics**: Visual progress bars and percentage breakdowns
 - **Responsive Design**: Modern, mobile-friendly interface with dark mode support
-- **Real-time Feedback**: Loading states and error handling for all transactions
+- **Smart Caching**: Server-side caching to prevent API rate limits
 
 ## 📋 Prerequisites
 
@@ -27,7 +30,7 @@ Before you begin, ensure you have:
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Ultra-Tech-code/stacks-test.git
 cd stacks-frontend
 ```
 
@@ -45,55 +48,160 @@ npm run dev
 
 ## 🔧 Configuration
 
-The contract configuration is located in `app/context/WalletContext.tsx`:
+### Contract Details
+
+The voting contract is deployed on Stacks Testnet:
+- **Contract Address**: `ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G`
+- **Contract Name**: `Blackadam-vote-contract`
+
+Configuration is located in `app/context/VotingContext.tsx`:
 
 ```typescript
 const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
-const CONTRACT_NAME = 'blonde-peach-tern';
+const CONTRACT_NAME = 'Blackadam-vote-contract';
 const NETWORK = STACKS_TESTNET;
 ```
 
-Update these values if you deploy a new contract.
+## 📖 Usage
 
-## 📦 Contract Functions
+### Creating a Poll
 
-The DApp supports the following contract interactions:
+1. Connect your wallet using the "Connect Wallet" button
+2. Fill in the poll details:
+   - **Title**: Poll question (max 256 characters)
+   - **Description**: Additional context (max 1024 characters)
+   - **Duration**: Length in days (automatically converts to blocks: 1 day = 144 blocks)
+3. Click "Create" and approve the transaction in your wallet
 
-### **Set Value**
-Store a key-value pair in the contract's map (max 32 bytes each)
-```clarity
-(define-public (set-value (key (buff 32)) (value (buff 32))))
+### Voting on a Poll
+
+1. Browse active polls in the "Polls" section
+2. Click "👍 Yes" or "👎 No" on any active poll
+3. Approve the transaction in your wallet
+4. The poll updates automatically via WebSocket when your vote is confirmed
+
+### Ending a Poll
+
+Poll creators can end their polls before the duration expires:
+1. Find your poll (shows "End" button only for your polls)
+2. Click "End" and confirm
+3. The poll status changes to "Ended"
+
+## 🏗️ Architecture
+
+### Tech Stack
+
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
+- **Styling**: Tailwind CSS 4 with dark mode support
+- **Blockchain**: Stacks SDK (@stacks/connect, @stacks/transactions)
+- **Real-time**: WebSocket (@stacks/blockchain-api-client)
+- **API**: Next.js API Routes with server-side caching
+
+### Key Components
+
+- **`app/components/VotingDApp.tsx`**: Main voting interface
+- **`app/context/VotingContext.tsx`**: Contract interaction logic
+- **`app/context/WalletContext.tsx`**: Wallet connection management
+- **`app/hooks/useStacksWebSocket.ts`**: WebSocket integration for live updates
+- **`app/api/voting/`**: API routes for fetching polls and vote history
+
+### API Endpoints
+
+- **`POST /api/voting/all-polls`**: Fetch all polls (batched, server-side)
+- **`POST /api/voting/user-votes`**: Get user's voting history
+- **`POST /api/voting/clear-cache`**: Cache invalidation
+
+### Smart Contract Functions
+
+- **`create-poll`**: Create a new poll with title, description, and duration
+- **`vote`**: Cast a vote (Yes/No) on a poll
+- **`end-poll`**: End an active poll (creator only)
+- **`get-poll`**: Read poll data by ID
+- **`get-poll-count`**: Get total number of polls
+
+## 🔄 Real-time Updates
+
+The app uses WebSocket to listen for contract events:
+- Automatically refreshes polls when transactions occur
+- Updates vote counts in real-time
+- No polling required - fully event-driven
+
+## 💾 Data Persistence
+
+- **Vote History**: Fetched from on-chain transaction history
+- **Poll Data**: Retrieved from contract storage
+- **Caching**: 30-second server-side cache to prevent rate limits
+
+## 🎨 UI Features
+
+- Live WebSocket connection indicator
+- Visual vote progress bars with percentages
+- Disabled state for already-voted polls
+- Transaction status notifications
+- Loading states for all async operations
+- Responsive layout for mobile/desktop
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+app/
+├── components/
+│   └── VotingDApp.tsx          # Main voting UI
+├── context/
+│   ├── VotingContext.tsx       # Contract interactions
+│   └── WalletContext.tsx       # Wallet connection
+├── hooks/
+│   └── useStacksWebSocket.ts   # WebSocket hook
+├── api/
+│   └── voting/
+│       ├── all-polls/          # Batch poll fetcher
+│       ├── user-votes/         # Vote history
+│       └── clear-cache/        # Cache management
+├── voting/
+│   └── page.tsx                # Voting page route
+└── page.tsx                    # Homepage
 ```
 
-### **Get Value**
-Retrieve a stored value by its key
-```clarity
-(define-public (get-value (key (buff 32))))
+### Build for Production
+
+```bash
+npm run build
+npm start
 ```
 
-### **Test Event Types**
-Execute multiple contract operations:
-- Mint 3 fungible tokens
-- Mint an NFT
-- Transfer 60 STX
-- Burn 20 STX
-```clarity
-(define-public (test-event-types))
-```
+## 🔍 Troubleshooting
 
-### **Test Emit Event**
-Emit a simple event that prints "Event! Hello world"
-```clarity
-(define-public (test-emit-event))
-```
+### Wallet Connection Issues
+- Ensure you have a Stacks wallet extension installed
+- Check that you're on Testnet mode in your wallet
+- Clear browser cache and reconnect
 
-## 🛠️ Tech Stack
+### Transaction Failures
+- Verify you have enough testnet STX for fees
+- Check that the poll hasn't already ended
+- Make sure you haven't already voted on the poll
 
-- **Framework**: Next.js 16 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS 4
-- **Blockchain**: Stacks Network
-- **Wallet SDK**: @stacks/connect
+### Polls Not Loading
+- Refresh the page
+- Click the "🔄 Load Polls" button
+- Check browser console for errors
+
+## 📄 License
+
+This project is open source and available under the MIT License.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 🔗 Links
+
+- [Stacks Documentation](https://docs.stacks.co/)
+- [Clarity Language](https://book.clarity-lang.org/)
+- [Hiro Platform](https://platform.hiro.so/)
+- [Testnet Explorer](https://explorer.hiro.so/?chain=testnet)
 - **Network**: @stacks/network
 - **Transactions**: @stacks/transactions
 - **Event Monitoring**: @hirosystems/chainhooks-client
