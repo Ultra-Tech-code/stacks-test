@@ -23,6 +23,7 @@ export default function VotingDApp() {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [pollCount, setPollCount] = useState(0);
   const [loadingPolls, setLoadingPolls] = useState(false);
+  const [votedPolls, setVotedPolls] = useState<Set<number>>(new Set());
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -32,6 +33,7 @@ export default function VotingDApp() {
   const handleWebSocketEvent = useCallback((event: any) => {
     console.log('WebSocket event received, refreshing polls...', event);
     fetchPolls();
+    fetchUserVotes(); // Also refresh vote status
   }, []);
 
   // Connect to WebSocket
@@ -126,6 +128,28 @@ export default function VotingDApp() {
     return '';
   };
 
+  const fetchUserVotes = useCallback(async () => {
+    if (!isConnected || !address) return;
+    
+    try {
+      console.log('Fetching user vote history...');
+      const response = await fetch('/api/voting/user-votes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address }),
+      });
+      
+      const data = await response.json();
+      console.log('User votes:', data);
+      
+      if (data.votedPolls) {
+        setVotedPolls(new Set(data.votedPolls));
+      }
+    } catch (error) {
+      console.error('Error fetching user votes:', error);
+    }
+  }, [isConnected, address]);
+
   const fetchPolls = useCallback(async () => {
     if (!isConnected) return;
     
@@ -200,12 +224,13 @@ export default function VotingDApp() {
     }
   }, [isConnected, address]);
 
-  // Fetch polls on initial load
+  // Fetch polls and user votes on initial load
   useEffect(() => {
     if (isConnected) {
       fetchPolls();
+      fetchUserVotes();
     }
-  }, [isConnected, fetchPolls]);
+  }, [isConnected, fetchPolls, fetchUserVotes]);
 
   const handleCreate = async () => {
     if (!title || !description) {
@@ -221,6 +246,8 @@ export default function VotingDApp() {
 
   const handleVote = async (pollId: number, voteYes: boolean) => {
     await vote(pollId, voteYes);
+    // Refetch user votes after voting to update the UI
+    setTimeout(() => fetchUserVotes(), 3000);
   };
 
   const handleEnd = async (pollId: number) => {
@@ -364,14 +391,22 @@ export default function VotingDApp() {
 
                   {poll.isActive && (
                     <div className="flex gap-2 mt-4">
-                      <button onClick={() => handleVote(poll.pollId, true)} disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded">
-                        👍 Yes
-                      </button>
-                      <button onClick={() => handleVote(poll.pollId, false)} disabled={loading} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded">
-                        👎 No
-                      </button>
+                      {votedPolls.has(poll.pollId) ? (
+                        <div className="w-full text-center py-2 bg-gray-100 dark:bg-gray-700 rounded text-sm">
+                          ✓ You voted on this poll
+                        </div>
+                      ) : (
+                        <>
+                          <button onClick={() => handleVote(poll.pollId, true)} disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 rounded">
+                            👍 Yes
+                          </button>
+                          <button onClick={() => handleVote(poll.pollId, false)} disabled={loading} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-2 rounded">
+                            👎 No
+                          </button>
+                        </>
+                      )}
                       {poll.creator === address && (
-                        <button onClick={() => handleEnd(poll.pollId)} disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded">
+                        <button onClick={() => handleEnd(poll.pollId)} disabled={loading} className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white px-4 py-2 rounded">
                           End
                         </button>
                       )}
