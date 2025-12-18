@@ -2,6 +2,8 @@
 
 A decentralized voting application built with Next.js that interacts with a Clarity smart contract on the Stacks Testnet. This DApp enables users to create polls, cast votes, and view results in real-time using WebSocket updates.
 
+🚀 **Live Demo**: [https://stacksvote.vercel.app](https://stacksvote.vercel.app)
+
 ## 🌟 Features
 
 - **Wallet Integration**: Connect with Leather or Xverse wallet extensions
@@ -198,6 +200,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🔗 Links
 
+- **Live Demo**: [https://stacksvote.vercel.app](https://stacksvote.vercel.app)
+- **GitHub Repository**: [https://github.com/Ultra-Tech-code/stacks-test](https://github.com/Ultra-Tech-code/stacks-test)
 - [Stacks Documentation](https://docs.stacks.co/)
 - [Clarity Language](https://book.clarity-lang.org/)
 - [Hiro Platform](https://platform.hiro.so/)
