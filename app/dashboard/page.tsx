@@ -19,8 +19,6 @@ export default function Dashboard() {
     success
   } = useWallet();
   
-  const loading = walletLoading || isLoading;
-
   const [stats, setStats] = useState({
     totalTransactions: 0,
     activeUsers: 0,
@@ -31,6 +29,8 @@ export default function Dashboard() {
   });
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const loading = walletLoading || isLoading;
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -301,7 +301,7 @@ export default function Dashboard() {
                 <ChartBarIcon className="h-6 w-6" />
               </div>
               <span className="mt-2 text-sm font-medium text-gray-900 dark:text-white">View Analytics</span>
-            </button>
+            </a>
             <button className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-500 dark:hover:border-purple-400 transition-colors">
               <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400">
                 <UserGroupIcon className="h-6 w-6" />
