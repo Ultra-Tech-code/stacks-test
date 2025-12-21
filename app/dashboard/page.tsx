@@ -12,32 +12,56 @@ export default function Dashboard() {
     connectWallet, 
     disconnectWallet, 
     callGetValue,
-    loading,
+    fetchBlockchainStats,
+    fetchAccountBalance,
+    loading: walletLoading,
     error,
     success
   } = useWallet();
+  
+  const loading = walletLoading || isLoading;
 
   const [stats, setStats] = useState({
     totalTransactions: 0,
     activeUsers: 0,
     totalValue: 0,
-    avgBlockTime: 0
+    avgBlockTime: 0,
+    currentStxPrice: 0,
+    totalStxSupply: 0
   });
+  const [accountBalance, setAccountBalance] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate fetching stats
     const fetchStats = async () => {
-      // In a real app, you would fetch these from your blockchain or API
-      setStats({
-        totalTransactions: 1245,
-        activeUsers: 342,
-        totalValue: 12450.75,
-        avgBlockTime: 10.2
-      });
+      try {
+        setIsLoading(true);
+        
+        // Fetch blockchain stats
+        const statsData = await fetchBlockchainStats();
+        setStats({
+          totalTransactions: statsData.totalTransactions,
+          activeUsers: statsData.activeUsers,
+          totalValue: statsData.totalValue,
+          avgBlockTime: statsData.avgBlockTime,
+          currentStxPrice: statsData.currentStxPrice,
+          totalStxSupply: statsData.totalStxSupply
+        });
+
+        // Fetch account balance if connected
+        if (isConnected && address) {
+          const balance = await fetchAccountBalance(address);
+          setAccountBalance(balance);
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchStats();
-  }, []);
+  }, [isConnected, address, fetchBlockchainStats, fetchAccountBalance]);
 
   interface StatCardProps {
     title: string;
@@ -124,25 +148,25 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard 
             title="Total Transactions" 
-            value={stats.totalTransactions} 
+            value={isLoading ? '...' : stats.totalTransactions.toLocaleString()} 
             icon={CubeIcon} 
             color="blue" 
           />
           <StatCard 
             title="Active Users" 
-            value={stats.activeUsers} 
+            value={isLoading ? '...' : stats.activeUsers.toLocaleString()} 
             icon={UserGroupIcon} 
             color="green" 
           />
           <StatCard 
             title="Total Value Locked" 
-            value={stats.totalValue} 
+            value={isLoading ? '...' : `$${stats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} 
             icon={CurrencyDollarIcon} 
             color="purple" 
           />
           <StatCard 
             title="Avg. Block Time" 
-            value={`${stats.avgBlockTime}s`} 
+            value={isLoading ? '...' : `${stats.avgBlockTime.toFixed(2)}s`} 
             icon={ClockIcon} 
             color="yellow" 
           />
@@ -183,19 +207,89 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Account Info */}
+        {isConnected && address && (
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mb-8">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Your Account</h3>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Wallet Address</p>
+                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white break-all">
+                    {address}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Balance</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                    {isLoading ? '...' : `${accountBalance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} STX`}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {isLoading ? '...' : `$${(accountBalance! * stats.currentStxPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Network Stats */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mb-8">
+          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Network Statistics</h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Current STX Price</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                  {isLoading ? '...' : `$${stats.currentStxPrice.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total STX Supply</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                  {isLoading ? '...' : `${(stats.totalStxSupply / 1000000).toLocaleString(undefined, { maximumFractionDigits: 0 })}M STX`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Quick Actions */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Quick Actions</h3>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
-              <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
-                <ArrowPathIcon className="h-6 w-6" />
+            <button 
+              onClick={() => window.location.reload()}
+              disabled={loading}
+              className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors ${
+                loading 
+                  ? 'border-gray-200 dark:border-gray-700 cursor-not-allowed' 
+                  : 'border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400'
+              }`}
+            >
+              <div className={`p-3 rounded-full ${
+                loading ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-100 dark:bg-blue-900/50'
+              } text-blue-600 dark:text-blue-400`}>
+                <ArrowPathIcon className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} />
               </div>
-              <span className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Refresh Data</span>
+              <span className={`mt-2 text-sm font-medium ${
+                loading ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'
+              }`}>
+                {loading ? 'Refreshing...' : 'Refresh Data'}
+              </span>
             </button>
-            <button className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 dark:hover:border-green-400 transition-colors">
+            <a 
+              href="https://explorer.stacks.co/?chain=testnet" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 dark:hover:border-green-400 transition-colors"
+            >
               <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400">
                 <ChartBarIcon className="h-6 w-6" />
               </div>
