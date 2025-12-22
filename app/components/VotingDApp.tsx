@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useVoting } from '../context/VotingContext';
 import { useWallet } from '../context/WalletContext';
 import { useStacksWebSocket } from '../hooks/useStacksWebSocket';
+import PollCountdown from './PollCountdown';
 
 interface Poll {
   pollId: number;
@@ -349,13 +350,16 @@ export default function VotingDApp() {
               return (
                 <div key={poll.pollId} className="border rounded-lg p-4">
                   <div className="flex justify-between mb-2">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-lg font-semibold">{poll.title}</h3>
-                      <p className="text-sm text-gray-600">{poll.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{poll.description}</p>
                     </div>
-                    <span className={`px-2 py-1 rounded text-xs h-fit ${poll.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                      {poll.isActive ? 'Active' : 'Ended'}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`px-2 py-1 rounded text-xs h-fit ${poll.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 dark:text-gray-400'}`}>
+                        {poll.isActive ? 'Active' : 'Ended'}
+                      </span>
+                      <PollCountdown endBlock={poll.endBlock} isActive={poll.isActive} />
+                    </div>
                   </div>
 
                   <div className="mt-4 space-y-2">
