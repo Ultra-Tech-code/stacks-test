@@ -5,6 +5,7 @@ import { useVoting } from '../context/VotingContext';
 import { useWallet } from '../context/WalletContext';
 import { useStacksWebSocket } from '../hooks/useStacksWebSocket';
 import PollCountdown from './PollCountdown';
+import PollDetailsModal from './PollDetailsModal';
 
 interface Poll {
   pollId: number;
@@ -25,6 +26,7 @@ export default function VotingDApp() {
   const [pollCount, setPollCount] = useState(0);
   const [loadingPolls, setLoadingPolls] = useState(false);
   const [votedPolls, setVotedPolls] = useState<Set<number>>(new Set());
+  const [selectedPoll, setSelectedPoll] = useState<{ id: number; title: string } | null>(null);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -357,7 +359,11 @@ export default function VotingDApp() {
               
               return (
                 <div key={poll.pollId} className="border rounded-lg p-4">
-                  <div className="flex justify-between mb-2">
+                  <div 
+                    className="flex justify-between mb-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 -m-4 p-4 rounded-t-lg transition-colors"
+                    onClick={() => setSelectedPoll({ id: poll.pollId, title: poll.title })}
+                    title="Click to view voters"
+                  >
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold">{poll.title}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{poll.description}</p>
@@ -423,6 +429,15 @@ export default function VotingDApp() {
           </div>
         )}
       </div>
+
+      {/* Poll Details Modal */}
+      {selectedPoll && (
+        <PollDetailsModal
+          pollId={selectedPoll.id}
+          pollTitle={selectedPoll.title}
+          onClose={() => setSelectedPoll(null)}
+        />
+      )}
     </div>
   );
 }
