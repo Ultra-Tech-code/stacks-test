@@ -28,9 +28,9 @@ export async function POST(request: Request) {
     const limit = 50; // Max allowed by Hiro API
     let hasMore = true;
 
-    // Fetch transactions with pagination
+    // Fetch transactions calling the contract (not just from deployer address)
     while (hasMore && offset < 200) { // Limit to 4 pages max (200 transactions)
-      const url = `https://api.testnet.hiro.so/extended/v1/address/${contractId.split('.')[0]}/transactions?limit=${limit}&offset=${offset}`;
+      const url = `https://api.testnet.hiro.so/extended/v1/address/${contractId}/transactions?limit=${limit}&offset=${offset}`;
       console.log('Fetching from URL:', url);
       
       const response = await fetch(url, {
