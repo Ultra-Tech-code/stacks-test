@@ -29,15 +29,15 @@ export default function PollCountdown({ endBlock, isActive }: PollCountdownProps
   }, []);
 
   useEffect(() => {
-    if (!isActive || currentBlock === 0) {
+    if (currentBlock === 0) {
       setTimeRemaining('');
       return;
     }
 
     const blocksRemaining = endBlock - currentBlock;
     
-    if (blocksRemaining <= 0) {
-      setTimeRemaining('Ended');
+    if (blocksRemaining <= 0 || !isActive) {
+      setTimeRemaining('');
       return;
     }
 
@@ -56,11 +56,7 @@ export default function PollCountdown({ endBlock, isActive }: PollCountdownProps
     }
   }, [endBlock, currentBlock, isActive]);
 
-  if (!isActive) {
-    return <span className="text-xs text-gray-500 dark:text-gray-400">Ended</span>;
-  }
-
-  if (!timeRemaining) {
+  if (!isActive || !timeRemaining) {
     return null;
   }
 
@@ -68,13 +64,8 @@ export default function PollCountdown({ endBlock, isActive }: PollCountdownProps
   const isUrgent = blocksRemaining <= 14; // Less than ~2.5 hours
 
   return (
-    <div className="flex flex-col items-end">
-      <span className={`text-xs font-medium ${isUrgent ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`}>
-        {isUrgent && '⏰ '}{timeRemaining} remaining
-      </span>
-      <span className="text-xs text-gray-500 dark:text-gray-400">
-        Block {currentBlock.toLocaleString()} / {endBlock.toLocaleString()}
-      </span>
-    </div>
+    <span className={`text-xs font-medium ${isUrgent ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`}>
+      {isUrgent && '⏰ '}{timeRemaining} remaining
+    </span>
   );
 }

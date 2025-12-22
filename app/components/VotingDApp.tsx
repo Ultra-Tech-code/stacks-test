@@ -177,6 +177,11 @@ export default function VotingDApp() {
         return;
       }
 
+      // Fetch current block height to verify poll status
+      const blockResponse = await fetch('https://api.testnet.hiro.so/v2/info');
+      const blockData = await blockResponse.json();
+      const currentBlock = blockData.stacks_tip_height;
+
       const pollData: Poll[] = data.polls
         .map((pollResponse: any, index: number) => {
           if (!pollResponse.okay || !pollResponse.result) {
@@ -188,6 +193,9 @@ export default function VotingDApp() {
             return null;
           }
 
+          // Check if poll has actually ended based on block height
+          const isActuallyActive = parsed.isActive && parsed.endBlock > currentBlock;
+
           return {
             pollId: index,
             creator: parsed.creator,
@@ -196,7 +204,7 @@ export default function VotingDApp() {
             yesVotes: parsed.yesVotes,
             noVotes: parsed.noVotes,
             endBlock: parsed.endBlock,
-            isActive: parsed.isActive,
+            isActive: isActuallyActive,
           };
         })
         .filter((poll: Poll | null): poll is Poll => poll !== null)
