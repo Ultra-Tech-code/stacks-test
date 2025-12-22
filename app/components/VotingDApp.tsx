@@ -388,7 +388,7 @@ export default function VotingDApp() {
                     </div>
                   </div>
 
-                  {poll.isActive && (
+                  {poll.isActive ? (
                     <div className="flex gap-2 mt-4">
                       {votedPolls.has(poll.pollId) ? (
                         <div className="w-full text-center py-2 bg-gray-100 dark:bg-gray-700 rounded text-sm">
@@ -410,6 +410,12 @@ export default function VotingDApp() {
                         </button>
                       )}
                     </div>
+                  ) : (
+                    votedPolls.has(poll.pollId) && (
+                      <div className="w-full text-center py-2 bg-gray-100 dark:bg-gray-700 rounded text-sm mt-4">
+                        ✓ You voted on this poll
+                      </div>
+                    )
                   )}
                 </div>
               );
