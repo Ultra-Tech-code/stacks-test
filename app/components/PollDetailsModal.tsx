@@ -32,6 +32,12 @@ export default function PollDetailsModal({ pollId, pollTitle, onClose }: PollDet
         });
 
         const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('API Error:', data);
+          return;
+        }
+        
         if (data.voters) {
           setVoters(data.voters);
           setStats({
