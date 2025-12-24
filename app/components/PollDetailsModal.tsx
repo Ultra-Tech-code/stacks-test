@@ -13,10 +13,12 @@ interface Voter {
 interface PollDetailsModalProps {
   pollId: number;
   pollTitle: string;
+  contractYesVotes: number;
+  contractNoVotes: number;
   onClose: () => void;
 }
 
-export default function PollDetailsModal({ pollId, pollTitle, onClose }: PollDetailsModalProps) {
+export default function PollDetailsModal({ pollId, pollTitle, contractYesVotes, contractNoVotes, onClose }: PollDetailsModalProps) {
   const [voters, setVoters] = useState<Voter[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalVoters: 0, yesVotes: 0, noVotes: 0 });
@@ -85,19 +87,26 @@ export default function PollDetailsModal({ pollId, pollTitle, onClose }: PollDet
         </div>
 
         {/* Stats */}
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalVoters}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Total Voters</div>
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/50">
+          <div className="grid grid-cols-3 gap-4 mb-3">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalVoters}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Unique Voters</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.yesVotes}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Yes Votes</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.noVotes}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">No Votes</p>
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.yesVotes}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Yes Votes</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.noVotes}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">No Votes</div>
-          </div>
+          {(contractYesVotes !== stats.yesVotes || contractNoVotes !== stats.noVotes) && (
+            <div className="text-xs text-center text-amber-600 dark:text-amber-400 border-t border-gray-200 dark:border-gray-700 pt-2">
+              ⚠️ Contract state shows {contractYesVotes} Yes / {contractNoVotes} No votes (may include duplicate votes)
+            </div>
+          )}
         </div>
 
         {/* Voters List */}
