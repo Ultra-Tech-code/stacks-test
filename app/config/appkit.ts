@@ -1,37 +1,65 @@
 'use client'
 
-import { createAppKit } from '@reown/appkit/react'
-import { BitcoinAdapter } from '@reown/appkit-adapter-bitcoin'
-import { bitcoin, bitcoinTestnet } from '@reown/appkit/networks'
+import type { CustomCaipNetwork } from '@reown/appkit-common'
+import { UniversalConnector } from '@reown/appkit-universal-connector'
 
 // Project ID from Reown dashboard
-const projectId = '20756fc0c561a6678393ec547de8cf1f'
+export const projectId = '20756fc0c561a6678393ec547de8cf1f'
 
-// Set the networks (Bitcoin testnet for Stacks compatibility)
-const networks = [bitcoinTestnet, bitcoin]
-
-// Set up Bitcoin Adapter
-const bitcoinAdapter = new BitcoinAdapter({
-  projectId
-})
-
-// Metadata for the app
-const metadata = {
-  name: 'Stacks Voting DApp',
-  description: 'Decentralized voting application on Stacks blockchain',
-  url: 'https://stacksvote.vercel.app',
-  icons: ['https://avatars.githubusercontent.com/u/181229932']
+if (!projectId) {
+  throw new Error('Project ID is not defined')
 }
 
-// Create AppKit modal
-export const modal = createAppKit({
-  adapters: [bitcoinAdapter],
-  networks,
-  metadata,
-  projectId,
-  features: {
-    analytics: true,
-    email: false,
-    socials: []
+// Configure Stacks Testnet network
+const stacksTestnet: CustomCaipNetwork<'stacks'> = {
+  id: 2147483648, // Stacks testnet chain ID
+  chainNamespace: 'stacks' as const,
+  caipNetworkId: 'stacks:testnet',
+  name: 'Stacks Testnet',
+  nativeCurrency: { name: 'STX', symbol: 'STX', decimals: 6 },
+  rpcUrls: { default: { http: ['https://api.testnet.hiro.so'] } }
+}
+
+// Configure Stacks Mainnet network
+const stacksMainnet: CustomCaipNetwork<'stacks'> = {
+  id: 1, // Stacks mainnet chain ID
+  chainNamespace: 'stacks' as const,
+  caipNetworkId: 'stacks:mainnet',
+  name: 'Stacks',
+  nativeCurrency: { name: 'STX', symbol: 'STX', decimals: 6 },
+  rpcUrls: { default: { http: ['https://api.hiro.so'] } }
+}
+
+let universalConnectorInstance: Awaited<ReturnType<typeof UniversalConnector.init>> | null = null
+
+export async function getUniversalConnector() {
+  if (universalConnectorInstance) {
+    return universalConnectorInstance
   }
-})
+
+  universalConnectorInstance = await UniversalConnector.init({
+    projectId,
+    metadata: {
+      name: 'Stacks Voting DApp',
+      description: 'Decentralized voting application on Stacks blockchain',
+      url: 'https://stacksvote.vercel.app',
+      icons: ['https://stacksvote.vercel.app/icon.png']
+    },
+    networks: [
+      {
+        methods: [
+          'stx_getAddresses',
+          'stx_transferStx',
+          'stx_signTransaction',
+          'stx_signMessage',
+          'stx_callContract'
+        ],
+        chains: [stacksTestnet as CustomCaipNetwork, stacksMainnet as CustomCaipNetwork],
+        events: [],
+        namespace: 'stacks'
+      }
+    ]
+  })
+
+  return universalConnectorInstance
+}

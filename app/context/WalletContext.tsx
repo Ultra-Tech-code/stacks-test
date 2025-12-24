@@ -1,13 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
+import { getUniversalConnector } from '../config/appkit';
 import { STACKS_TESTNET } from '@stacks/network';
 import { principalCV, uintCV, bufferCV } from '@stacks/transactions';
 import { openContractCall } from '@stacks/connect';
-
-// Import AppKit configuration
-import '../config/appkit';
 
 interface BlockchainStats {
   totalTransactions: number;
@@ -42,69 +39,95 @@ const CONTRACT_NAME = 'blonde-peach-tern';
 const NETWORK = STACKS_TESTNET;
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { open } = useAppKit()
-  const { address: appKitAddress, isConnected: appKitConnected } = useAppKitAccount()
-  const { walletProvider } = useAppKitProvider('bip122')
-  
-  const [stacksAddress, setStacksAddress] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [universalConnector, setUniversalConnector] = useState<any>(null);
 
   const clearMessages = useCallback(() => {
     setError(null);
     setSuccess(null);
   }, []);
 
-  // Get Stacks address when wallet connects
+  // Initialize UniversalConnector
   useEffect(() => {
-    const getStacksAddress = async () => {
-      if (appKitConnected && walletProvider) {
-        try {
-          // Get account addresses from Bitcoin wallet (includes STX address)
-          const accounts = await (walletProvider as any).getAccountAddresses()
-          
-          // Find the Stacks address (purpose: 'stx')
-          const stxAccount = accounts.find((acc: any) => acc.purpose === 'stx')
-          
-          if (stxAccount) {
-            setStacksAddress(stxAccount.address)
-          } else {
-            // If no STX address, try to use the payment address as fallback
-            const paymentAccount = accounts.find((acc: any) => acc.purpose === 'payment')
-            setStacksAddress(paymentAccount?.address || null)
+    const initConnector = async () => {
+      try {
+        const connector = await getUniversalConnector();
+        setUniversalConnector(connector);
+        
+        // Check if already connected
+        if ((connector as any).session) {
+          const addresses: any = await (connector as any).request({ method: 'stx_getAddresses', params: {} });
+          if (addresses?.addresses?.length > 0) {
+            const stxAddress = addresses.addresses.find((addr: any) => addr.symbol === 'STX');
+            if (stxAddress) {
+              setAddress(stxAddress.address);
+              setIsConnected(true);
+            }
           }
-        } catch (err) {
-          console.error('Error getting Stacks address:', err)
-          setError('Failed to retrieve Stacks address from wallet')
         }
-      } else {
-        setStacksAddress(null)
+      } catch (err) {
+        console.error('Error initializing connector:', err);
       }
-    }
+    };
 
-    getStacksAddress()
-  }, [appKitConnected, walletProvider])
-
-  const connectWallet = useCallback(() => {
-    open()
-  }, [open]);
-
-  const disconnectWallet = useCallback(async () => {
-    try {
-      const { open } = useAppKit()
-      // Open modal to disconnect
-      open({ view: 'Account' })
-    } catch (err) {
-      console.error('Disconnect error:', err)
-    }
-    setStacksAddress(null)
-    setError(null)
-    setSuccess(null)
+    initConnector();
   }, []);
 
+  const connectWallet = useCallback(async () => {
+    if (!universalConnector) {
+      setError('Connector not initialized');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { session } = await (universalConnector as any).connect();
+      
+      if (session) {
+        // Get Stacks addresses
+        const addresses: any = await (universalConnector as any).request({ 
+          method: 'stx_getAddresses', 
+          params: {} 
+        });
+        
+        if (addresses?.addresses?.length > 0) {
+          const stxAddress = addresses.addresses.find((addr: any) => addr.symbol === 'STX');
+          if (stxAddress) {
+            setAddress(stxAddress.address);
+            setIsConnected(true);
+            setError(null);
+          } else {
+            setError('No Stacks address found');
+          }
+        }
+      }
+    } catch (err) {
+      setError(`Connection failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [universalConnector]);
+
+  const disconnectWallet = useCallback(async () => {
+    if (!universalConnector) return;
+
+    try {
+      await universalConnector.disconnect();
+      setAddress(null);
+      setIsConnected(false);
+      setError(null);
+      setSuccess(null);
+    } catch (err) {
+      console.error('Disconnect error:', err);
+    }
+  }, [universalConnector]);
+
   const callSetValue = useCallback(async (key: string, value: string) => {
-    if (!stacksAddress) {
+    if (!address) {
       setError('Please connect your wallet first');
       return;
     }
@@ -133,10 +156,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, [stacksAddress]);
+  }, [address]);
 
   const callGetValue = useCallback(async (key: string) => {
-    if (!stacksAddress) {
+    if (!address) {
       setError('Please connect your wallet first');
       return;
     }
@@ -152,7 +175,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: stacksAddress,
+          sender: address,
           arguments: [`0x${Buffer.from(key).toString('hex')}`],
         }),
       });
@@ -164,10 +187,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } finally {
       setLoading(false);
     }
-  }, [stacksAddress]);
+  }, [address]);
 
   const callTestEventTypes = useCallback(async () => {
-    if (!stacksAddress) {
+    if (!address) {
       setError('Please connect your wallet first');
       return;
     }
@@ -196,10 +219,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, [stacksAddress]);
+  }, [address]);
 
   const callTestEmitEvent = useCallback(async () => {
-    if (!stacksAddress) {
+    if (!address) {
       setError('Please connect your wallet first');
       return;
     }
@@ -228,7 +251,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, [stacksAddress]);
+  }, [address]);
 
   const fetchBlockchainStats = useCallback(async (): Promise<BlockchainStats> => {
     try {
@@ -270,8 +293,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   return (
     <WalletContext.Provider
       value={{
-        address: stacksAddress,
-        isConnected: appKitConnected && !!stacksAddress,
+        address,
+        isConnected,
         connectWallet,
         disconnectWallet,
         callSetValue,
