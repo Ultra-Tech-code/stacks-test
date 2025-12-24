@@ -1,10 +1,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { AppConfig, showConnect, UserSession } from '@stacks/connect';
+import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 import { STACKS_TESTNET } from '@stacks/network';
 import { principalCV, uintCV, bufferCV } from '@stacks/transactions';
 import { openContractCall } from '@stacks/connect';
+
+// Import AppKit configuration
+import '../config/appkit';
 
 interface BlockchainStats {
   totalTransactions: number;
@@ -38,81 +41,71 @@ const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
 const CONTRACT_NAME = 'blonde-peach-tern';
 const NETWORK = STACKS_TESTNET;
 
-const appConfig = new AppConfig(['store_write', 'publish_data']);
-const userSession = new UserSession({ appConfig });
-
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [address, setAddress] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const { open } = useAppKit()
+  const { address: appKitAddress, isConnected: appKitConnected } = useAppKitAccount()
+  const { walletProvider } = useAppKitProvider('bip122')
+  
+  const [stacksAddress, setStacksAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [blockchainStats, setBlockchainStats] = useState<BlockchainStats | null>(null);
 
   const clearMessages = useCallback(() => {
     setError(null);
     setSuccess(null);
   }, []);
 
-  // Check for existing wallet connection on mount
+  // Get Stacks address when wallet connects
   useEffect(() => {
-    const checkConnection = () => {
-      if (userSession.isUserSignedIn()) {
-        const userData = userSession.loadUserData();
-        const userAddress = userData.profile.stxAddress.testnet;
-        console.log('User already signed in:', userAddress);
-        if (userAddress) {
-          setAddress(userAddress);
-          setIsConnected(true);
+    const getStacksAddress = async () => {
+      if (appKitConnected && walletProvider) {
+        try {
+          // Get account addresses from Bitcoin wallet (includes STX address)
+          const accounts = await (walletProvider as any).getAccountAddresses()
+          
+          // Find the Stacks address (purpose: 'stx')
+          const stxAccount = accounts.find((acc: any) => acc.purpose === 'stx')
+          
+          if (stxAccount) {
+            setStacksAddress(stxAccount.address)
+          } else {
+            // If no STX address, try to use the payment address as fallback
+            const paymentAccount = accounts.find((acc: any) => acc.purpose === 'payment')
+            setStacksAddress(paymentAccount?.address || null)
+          }
+        } catch (err) {
+          console.error('Error getting Stacks address:', err)
+          setError('Failed to retrieve Stacks address from wallet')
         }
+      } else {
+        setStacksAddress(null)
       }
-    };
+    }
 
-    checkConnection();
-  }, []);
+    getStacksAddress()
+  }, [appKitConnected, walletProvider])
 
   const connectWallet = useCallback(() => {
-    showConnect({
-      appDetails: {
-        name: 'Stacks DApp',
-        icon: window.location.origin + '/next.svg',
-      },
-      redirectTo: '/',
-      userSession,
-      onFinish: () => {
-        console.log('Connection finished!');
-        
-        // Get user data after connection
-        if (userSession.isUserSignedIn()) {
-          const userData = userSession.loadUserData();
-          const userAddress = userData.profile.stxAddress.testnet;
-          console.log('User address:', userAddress);
-          
-          if (userAddress) {
-            setAddress(userAddress);
-            setIsConnected(true);
-            setError(null);
-          } else {
-            setError('Failed to retrieve wallet address');
-          }
-        }
-      },
-      onCancel: () => {
-        console.log('Connection cancelled');
-        setError('Wallet connection cancelled');
-      },
-    });
-  }, []);
+    open()
+  }, [open]);
 
-  const disconnectWallet = useCallback(() => {
-    setAddress(null);
-    setIsConnected(false);
-    userSession.signUserOut();
+  const disconnectWallet = useCallback(async () => {
+    try {
+      const { open } = useAppKit()
+      // Open modal to disconnect
+      open({ view: 'Account' })
+    } catch (err) {
+      console.error('Disconnect error:', err)
+    }
+    setStacksAddress(null)
+    setError(null)
+    setSuccess(null)
   }, []);
 
   const callSetValue = useCallback(async (key: string, value: string) => {
-    if (!isConnected || !address) {
-      setError('Wallet not connected');
+    if (!stacksAddress) {
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -121,37 +114,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
 
     try {
-      // Convert string to buffer (max 32 bytes)
-      const keyBuffer = bufferCV(Buffer.from(key.padEnd(32, '\0')));
-      const valueBuffer = bufferCV(Buffer.from(value.padEnd(32, '\0')));
-
       await openContractCall({
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName: 'set-value',
-        functionArgs: [keyBuffer, valueBuffer],
+        functionArgs: [bufferCV(Buffer.from(key)), bufferCV(Buffer.from(value))],
         network: NETWORK,
         onFinish: (data) => {
-          console.log('Transaction submitted:', data.txId);
-          setSuccess(`Transaction submitted! TX ID: ${data.txId}`);
+          setSuccess(`Transaction broadcasted! TxID: ${data.txId}`);
           setLoading(false);
         },
         onCancel: () => {
-          setError('Transaction cancelled by user');
+          setError('Transaction canceled');
           setLoading(false);
         },
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to call set-value';
-      setError(errorMessage);
-      console.error('Contract call error:', err);
+      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [stacksAddress]);
 
   const callGetValue = useCallback(async (key: string) => {
-    if (!isConnected || !address) {
-      setError('Wallet not connected');
+    if (!stacksAddress) {
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -160,35 +146,29 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
 
     try {
-      const keyBuffer = bufferCV(Buffer.from(key.padEnd(32, '\0')));
-
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'get-value',
-        functionArgs: [keyBuffer],
-        network: NETWORK,
-        onFinish: (data) => {
-          console.log('Transaction submitted:', data.txId);
-          setSuccess(`Transaction submitted! TX ID: ${data.txId}`);
-          setLoading(false);
+      const response = await fetch('https://api.testnet.hiro.so/v2/contracts/call-read/ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G/blonde-peach-tern/get-value', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onCancel: () => {
-          setError('Transaction cancelled by user');
-          setLoading(false);
-        },
+        body: JSON.stringify({
+          sender: stacksAddress,
+          arguments: [`0x${Buffer.from(key).toString('hex')}`],
+        }),
       });
+
+      const data = await response.json();
+      setSuccess(`Value: ${data.result || 'Not found'}`);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to call get-value';
-      setError(errorMessage);
-      console.error('Contract call error:', err);
+      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [stacksAddress]);
 
   const callTestEventTypes = useCallback(async () => {
-    if (!isConnected || !address) {
-      setError('Wallet not connected');
+    if (!stacksAddress) {
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -204,26 +184,23 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         functionArgs: [],
         network: NETWORK,
         onFinish: (data) => {
-          console.log('Transaction submitted:', data.txId);
-          setSuccess(`Transaction submitted! TX ID: ${data.txId}`);
+          setSuccess(`Test event transaction broadcasted! TxID: ${data.txId}`);
           setLoading(false);
         },
         onCancel: () => {
-          setError('Transaction cancelled by user');
+          setError('Transaction canceled');
           setLoading(false);
         },
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to call test-event-types';
-      setError(errorMessage);
-      console.error('Contract call error:', err);
+      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [stacksAddress]);
 
   const callTestEmitEvent = useCallback(async () => {
-    if (!isConnected || !address) {
-      setError('Wallet not connected');
+    if (!stacksAddress) {
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -239,81 +216,62 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         functionArgs: [],
         network: NETWORK,
         onFinish: (data) => {
-          console.log('Transaction submitted:', data.txId);
-          setSuccess(`Transaction submitted! TX ID: ${data.txId}`);
+          setSuccess(`Emit event transaction broadcasted! TxID: ${data.txId}`);
           setLoading(false);
         },
         onCancel: () => {
-          setError('Transaction cancelled by user');
+          setError('Transaction canceled');
           setLoading(false);
         },
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to call test-emit-event';
-      setError(errorMessage);
-      console.error('Contract call error:', err);
+      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [stacksAddress]);
 
   const fetchBlockchainStats = useCallback(async (): Promise<BlockchainStats> => {
     try {
-      setLoading(true);
+      const response = await fetch('https://api.testnet.hiro.so/v2/info');
+      const data = await response.json();
       
-      // Fetch blockchain stats from Stacks API
-      const [networkStatusRes, stxPriceRes, totalSupplyRes] = await Promise.all([
-        fetch('https://stacks-node-api.testnet.stacks.co/v2/info/network_status'),
-        fetch('https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd'),
-        fetch('https://stacks-node-api.testnet.stacks.co/v2/info/total')
-      ]);
-
-      if (!networkStatusRes.ok || !stxPriceRes.ok || !totalSupplyRes.ok) {
-        throw new Error('Failed to fetch blockchain data');
-      }
-
-      const networkStatus = await networkStatusRes.json();
-      const priceData = await stxPriceRes.json();
-      const totalSupply = await totalSupplyRes.json();
-
-      // Calculate some stats
-      const stats: BlockchainStats = {
-        totalTransactions: networkStatus.tx_count || 0,
-        activeUsers: Math.floor(Math.random() * 1000), // This would come from your contract or an indexer
-        totalValue: (parseInt(totalSupply.total_stx) / 1000000) * (priceData.blockstack?.usd || 0.5),
-        avgBlockTime: networkStatus.avg_block_time || 10.2,
-        currentStxPrice: priceData.blockstack?.usd || 0.5,
-        totalStxSupply: parseInt(totalSupply.total_stx) / 1000000 // Convert to STX (6 decimal places)
+      return {
+        totalTransactions: data.tx_count || 0,
+        activeUsers: 342, // Simulated
+        totalValue: 12450.75, // Simulated
+        avgBlockTime: 10.2,
+        currentStxPrice: 0.50, // Simulated
+        totalStxSupply: data.stacks_tip_height * 1000 || 0 // Rough estimation
       };
-
-      setBlockchainStats(stats);
-      return stats;
-    } catch (err) {
-      console.error('Error fetching blockchain stats:', err);
-      throw err;
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching blockchain stats:', error);
+      return {
+        totalTransactions: 0,
+        activeUsers: 0,
+        totalValue: 0,
+        avgBlockTime: 0,
+        currentStxPrice: 0,
+        totalStxSupply: 0
+      };
     }
   }, []);
 
   const fetchAccountBalance = useCallback(async (address: string): Promise<number> => {
     try {
-      const response = await fetch(`https://stacks-node-api.testnet.stacks.co/v2/accounts/${address}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch account balance');
-      }
+      const response = await fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/stx`);
       const data = await response.json();
-      return parseInt(data.balance) / 1000000; // Convert to STX (6 decimal places)
-    } catch (err) {
-      console.error('Error fetching account balance:', err);
-      throw err;
+      return parseInt(data.balance) / 1000000; // Convert from micro-STX to STX
+    } catch (error) {
+      console.error('Error fetching account balance:', error);
+      return 0;
     }
   }, []);
 
   return (
     <WalletContext.Provider
       value={{
-        address,
-        isConnected,
+        address: stacksAddress,
+        isConnected: appKitConnected && !!stacksAddress,
         connectWallet,
         disconnectWallet,
         callSetValue,
@@ -333,10 +291,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   );
 };
 
-export const useWallet = (): WalletContextType => {
+export const useWallet = () => {
   const context = useContext(WalletContext);
   if (!context) {
-    throw new Error('useWallet must be used within WalletProvider');
+    throw new Error('useWallet must be used within a WalletProvider');
   }
   return context;
 };
