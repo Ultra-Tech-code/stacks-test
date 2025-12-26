@@ -1,9 +1,19 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { openContractCall } from '@stacks/connect';
+import { 
+  stringAsciiCV, 
+  uintCV, 
+  boolCV, 
+  makeContractCall, 
+  broadcastTransaction, 
+  AnchorMode,
+  PostConditionMode,
+  SignedContractCallOptions,
+  deserializeTransaction
+} from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
-import { stringAsciiCV, uintCV, boolCV, principalCV } from '@stacks/transactions';
+import { useAppKitProvider } from '@reown/appkit/react';
 import { useWallet } from './WalletContext';
 
 interface VotingContextType {
@@ -20,10 +30,11 @@ const VotingContext = createContext<VotingContextType | undefined>(undefined);
 
 const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
 const CONTRACT_NAME = 'Blackadam-vote-contract';
-const NETWORK = STACKS_TESTNET;
 
 export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isConnected, address } = useWallet();
+  const { address, isConnected } = useWallet();
+  const { walletProvider } = useAppKitProvider('stacks');
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -33,9 +44,59 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
   }, []);
 
+  const signAndBroadcast = useCallback(async (functionName: string, functionArgs: any[]) => {
+    if (!isConnected || !address) {
+      throw new Error('Wallet not connected');
+    }
+
+    if (!walletProvider) {
+      throw new Error('Wallet provider not available');
+    }
+
+    try {
+      // Build the transaction
+      const txOptions: SignedContractCallOptions = {
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName,
+        functionArgs,
+        senderKey: address,
+        network: STACKS_TESTNET,
+        // anchorMode: AnchorMode.Any,
+        postConditionMode: PostConditionMode.Allow,
+      };
+
+      const transaction = await makeContractCall(txOptions);
+      
+      // Type assertion for walletProvider
+      const provider = walletProvider as any;
+      
+      // Request signature from wallet via AppKit
+      const result = await provider.request({
+        method: 'stacks_signTransaction',
+        params: {
+          transaction: transaction.serialize().toString()
+        }
+      });
+      // Broadcast the signed transaction
+      const txBuffer = Buffer.from(result.transaction, 'hex');
+      const signedTx = deserializeTransaction(result.transaction);
+      const broadcastResponse = await broadcastTransaction({
+        transaction: signedTx,
+        network: STACKS_TESTNET
+      });
+   
+      
+      return broadcastResponse.txid;
+    } catch (err) {
+      console.error('Transaction error:', err);
+      throw err;
+    }
+  }, [isConnected, address, walletProvider]);
+
   const createPoll = useCallback(async (title: string, description: string, duration: number) => {
     if (!isConnected || !address) {
-      setError('Wallet not connected');
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -44,36 +105,25 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
 
     try {
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'create-poll',
-        functionArgs: [
-          stringAsciiCV(title),
-          stringAsciiCV(description),
-          uintCV(duration),
-        ],
-        network: NETWORK,
-        onFinish: (data) => {
-          setSuccess(`Poll created successfully! TX ID: ${data.txId}`);
-          setLoading(false);
-        },
-        onCancel: () => {
-          setError('Transaction cancelled by user');
-          setLoading(false);
-        },
-      });
+      const txId = await signAndBroadcast('create-poll', [
+        stringAsciiCV(title),
+        stringAsciiCV(description),
+        uintCV(duration),
+      ]);
+      
+      setSuccess(`Poll created successfully! TX ID: ${txId}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create poll';
       setError(errorMessage);
       console.error('Create poll error:', err);
+    } finally {
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, signAndBroadcast]);
 
   const vote = useCallback(async (pollId: number, voteYes: boolean) => {
     if (!isConnected || !address) {
-      setError('Wallet not connected');
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -82,35 +132,24 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
 
     try {
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'vote',
-        functionArgs: [
-          uintCV(pollId),
-          boolCV(voteYes),
-        ],
-        network: NETWORK,
-        onFinish: (data) => {
-          setSuccess(`Vote cast successfully! TX ID: ${data.txId}`);
-          setLoading(false);
-        },
-        onCancel: () => {
-          setError('Transaction cancelled by user');
-          setLoading(false);
-        },
-      });
+      const txId = await signAndBroadcast('vote', [
+        uintCV(pollId),
+        boolCV(voteYes),
+      ]);
+      
+      setSuccess(`Vote cast successfully! TX ID: ${txId}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to cast vote';
       setError(errorMessage);
       console.error('Vote error:', err);
+    } finally {
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, signAndBroadcast]);
 
   const endPoll = useCallback(async (pollId: number) => {
     if (!isConnected || !address) {
-      setError('Wallet not connected');
+      setError('Please connect your wallet first');
       return;
     }
 
@@ -119,28 +158,19 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
 
     try {
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'end-poll',
-        functionArgs: [uintCV(pollId)],
-        network: NETWORK,
-        onFinish: (data) => {
-          setSuccess(`Poll ended successfully! TX ID: ${data.txId}`);
-          setLoading(false);
-        },
-        onCancel: () => {
-          setError('Transaction cancelled by user');
-          setLoading(false);
-        },
-      });
+      const txId = await signAndBroadcast('end-poll', [
+        uintCV(pollId)
+      ]);
+      
+      setSuccess(`Poll ended successfully! TX ID: ${txId}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to end poll';
       setError(errorMessage);
       console.error('End poll error:', err);
+    } finally {
       setLoading(false);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, signAndBroadcast]);
 
   return (
     <VotingContext.Provider

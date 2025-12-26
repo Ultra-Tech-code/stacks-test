@@ -1,323 +1,76 @@
-'use client';
+'use client'
 
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { getUniversalConnector } from '../config/appkit';
-import { STACKS_TESTNET } from '@stacks/network';
-import { principalCV, uintCV, bufferCV } from '@stacks/transactions';
-import { openContractCall } from '@stacks/connect';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect } from '@reown/appkit/react'
+import '../config/appkit'
 
-interface BlockchainStats {
-  totalTransactions: number;
-  activeUsers: number;
-  totalValue: number;
-  avgBlockTime: number;
-  currentStxPrice: number;
-  totalStxSupply: number;
-}
-
+// Wallet Context type
 interface WalletContextType {
-  address: string | null;
-  isConnected: boolean;
-  connectWallet: () => void;
-  disconnectWallet: () => void;
-  callSetValue: (key: string, value: string) => Promise<void>;
-  callGetValue: (key: string) => Promise<void>;
-  callTestEventTypes: () => Promise<void>;
-  callTestEmitEvent: () => Promise<void>;
-  fetchBlockchainStats: () => Promise<BlockchainStats>;
-  fetchAccountBalance: (address: string) => Promise<number>;
-  loading: boolean;
-  error: string | null;
-  success: string | null;
-  clearMessages: () => void;
+  address: string | null
+  isConnected: boolean
+  connect: () => void
+  disconnect: () => void
 }
 
-const WalletContext = createContext<WalletContextType | undefined>(undefined);
+const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
-const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
-const CONTRACT_NAME = 'blonde-peach-tern';
-const NETWORK = STACKS_TESTNET;
+export function WalletProvider({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false)
+  const { open } = useAppKit()
+  const { address, isConnected } = useAppKitAccount()
+  const { disconnect: appKitDisconnect } = useDisconnect()
 
-export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [address, setAddress] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [universalConnector, setUniversalConnector] = useState<any>(null);
-
-  const clearMessages = useCallback(() => {
-    setError(null);
-    setSuccess(null);
-  }, []);
-
-  // Initialize UniversalConnector
+  // Set mounted state
   useEffect(() => {
-    const initConnector = async () => {
-      try {
-        const connector = await getUniversalConnector();
-        setUniversalConnector(connector);
-        
-        // Check if already connected
-        if ((connector as any).session) {
-          const addresses: any = await (connector as any).request({ method: 'stx_getAddresses', params: {} });
-          if (addresses?.addresses?.length > 0) {
-            const stxAddress = addresses.addresses.find((addr: any) => addr.symbol === 'STX');
-            if (stxAddress) {
-              setAddress(stxAddress.address);
-              setIsConnected(true);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error initializing connector:', err);
-      }
-    };
+    setMounted(true)
+  }, [])
 
-    initConnector();
-  }, []);
+  const connect = () => {
+    open()
+  }
 
-  const connectWallet = useCallback(async () => {
-    if (!universalConnector) {
-      setError('Connector not initialized');
-      return;
-    }
-
+  const disconnect = async () => {
     try {
-      setLoading(true);
-      const { session } = await (universalConnector as any).connect();
-      
-      if (session) {
-        // Get Stacks addresses
-        const addresses: any = await (universalConnector as any).request({ 
-          method: 'stx_getAddresses', 
-          params: {} 
-        });
-        
-        if (addresses?.addresses?.length > 0) {
-          const stxAddress = addresses.addresses.find((addr: any) => addr.symbol === 'STX');
-          if (stxAddress) {
-            setAddress(stxAddress.address);
-            setIsConnected(true);
-            setError(null);
-          } else {
-            setError('No Stacks address found');
-          }
-        }
-      }
+      await appKitDisconnect()
     } catch (err) {
-      setError(`Connection failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
+      console.error('Disconnect error:', err)
     }
-  }, [universalConnector]);
+  }
 
-  const disconnectWallet = useCallback(async () => {
-    if (!universalConnector) return;
-
-    try {
-      await universalConnector.disconnect();
-      setAddress(null);
-      setIsConnected(false);
-      setError(null);
-      setSuccess(null);
-    } catch (err) {
-      console.error('Disconnect error:', err);
-    }
-  }, [universalConnector]);
-
-  const callSetValue = useCallback(async (key: string, value: string) => {
-    if (!address) {
-      setError('Please connect your wallet first');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'set-value',
-        functionArgs: [bufferCV(Buffer.from(key)), bufferCV(Buffer.from(value))],
-        network: NETWORK,
-        onFinish: (data) => {
-          setSuccess(`Transaction broadcasted! TxID: ${data.txId}`);
-          setLoading(false);
-        },
-        onCancel: () => {
-          setError('Transaction canceled');
-          setLoading(false);
-        },
-      });
-    } catch (err) {
-      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setLoading(false);
-    }
-  }, [address]);
-
-  const callGetValue = useCallback(async (key: string) => {
-    if (!address) {
-      setError('Please connect your wallet first');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch('https://api.testnet.hiro.so/v2/contracts/call-read/ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G/blonde-peach-tern/get-value', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sender: address,
-          arguments: [`0x${Buffer.from(key).toString('hex')}`],
-        }),
-      });
-
-      const data = await response.json();
-      setSuccess(`Value: ${data.result || 'Not found'}`);
-    } catch (err) {
-      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [address]);
-
-  const callTestEventTypes = useCallback(async () => {
-    if (!address) {
-      setError('Please connect your wallet first');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'test-event-types',
-        functionArgs: [],
-        network: NETWORK,
-        onFinish: (data) => {
-          setSuccess(`Test event transaction broadcasted! TxID: ${data.txId}`);
-          setLoading(false);
-        },
-        onCancel: () => {
-          setError('Transaction canceled');
-          setLoading(false);
-        },
-      });
-    } catch (err) {
-      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setLoading(false);
-    }
-  }, [address]);
-
-  const callTestEmitEvent = useCallback(async () => {
-    if (!address) {
-      setError('Please connect your wallet first');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await openContractCall({
-        contractAddress: CONTRACT_ADDRESS,
-        contractName: CONTRACT_NAME,
-        functionName: 'test-emit-event',
-        functionArgs: [],
-        network: NETWORK,
-        onFinish: (data) => {
-          setSuccess(`Emit event transaction broadcasted! TxID: ${data.txId}`);
-          setLoading(false);
-        },
-        onCancel: () => {
-          setError('Transaction canceled');
-          setLoading(false);
-        },
-      });
-    } catch (err) {
-      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setLoading(false);
-    }
-  }, [address]);
-
-  const fetchBlockchainStats = useCallback(async (): Promise<BlockchainStats> => {
-    try {
-      const response = await fetch('https://api.testnet.hiro.so/v2/info');
-      const data = await response.json();
-      
-      return {
-        totalTransactions: data.tx_count || 0,
-        activeUsers: 342, // Simulated
-        totalValue: 12450.75, // Simulated
-        avgBlockTime: 10.2,
-        currentStxPrice: 0.50, // Simulated
-        totalStxSupply: data.stacks_tip_height * 1000 || 0 // Rough estimation
-      };
-    } catch (error) {
-      console.error('Error fetching blockchain stats:', error);
-      return {
-        totalTransactions: 0,
-        activeUsers: 0,
-        totalValue: 0,
-        avgBlockTime: 0,
-        currentStxPrice: 0,
-        totalStxSupply: 0
-      };
-    }
-  }, []);
-
-  const fetchAccountBalance = useCallback(async (address: string): Promise<number> => {
-    try {
-      const response = await fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/stx`);
-      const data = await response.json();
-      return parseInt(data.balance) / 1000000; // Convert from micro-STX to STX
-    } catch (error) {
-      console.error('Error fetching account balance:', error);
-      return 0;
-    }
-  }, []);
+  if (!mounted) {
+    return (
+      <WalletContext.Provider
+        value={{
+          address: null,
+          isConnected: false,
+          connect: () => {},
+          disconnect: async () => {}
+        }}
+      >
+        {children}
+      </WalletContext.Provider>
+    )
+  }
 
   return (
     <WalletContext.Provider
       value={{
-        address,
-        isConnected,
-        connectWallet,
-        disconnectWallet,
-        callSetValue,
-        callGetValue,
-        callTestEventTypes,
-        callTestEmitEvent,
-        fetchBlockchainStats,
-        fetchAccountBalance,
-        loading,
-        error,
-        success,
-        clearMessages,
+        address: address || null,
+        isConnected: isConnected || false,
+        connect,
+        disconnect
       }}
     >
       {children}
     </WalletContext.Provider>
-  );
-};
+  )
+}
 
-export const useWallet = () => {
-  const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error('useWallet must be used within a WalletProvider');
+// Hook to use the wallet context
+export function useWallet() {
+  const context = useContext(WalletContext)
+  if (context === undefined) {
+    throw new Error('useWallet must be used within a WalletProvider')
   }
-  return context;
-};
+  return context
+}

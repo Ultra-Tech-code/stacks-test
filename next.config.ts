@@ -1,12 +1,20 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Empty turbopack config to silence warning
+  // Turbopack configuration for Next.js 16+
   turbopack: {},
-  webpack: config => {
+  
+  // Webpack fallback for production builds
+  webpack: (config) => {
     config.externals.push('pino-pretty', 'lokijs', 'encoding')
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    }
     return config
-  }
+  },
 };
 
 export default nextConfig;

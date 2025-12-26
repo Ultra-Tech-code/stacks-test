@@ -2,21 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '../context/WalletContext';
+import WalletConnectButton from '../components/WalletConnectButton';
 import Link from 'next/link';
 import { ArrowTopRightOnSquareIcon, ArrowPathIcon, ChartBarIcon, CurrencyDollarIcon, UserGroupIcon, CubeIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 export default function Dashboard() {
   const { 
     address, 
-    isConnected, 
-    connectWallet, 
-    disconnectWallet, 
-    callGetValue,
-    fetchBlockchainStats,
-    fetchAccountBalance,
-    loading: walletLoading,
-    error,
-    success
+    isConnected
   } = useWallet();
   
   const [stats, setStats] = useState({
@@ -29,29 +22,30 @@ export default function Dashboard() {
   });
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  const loading = walletLoading || isLoading;
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setIsLoading(true);
         
-        // Fetch blockchain stats
-        const statsData = await fetchBlockchainStats();
+        // Fetch blockchain stats from Stacks API
+        const response = await fetch('https://api.testnet.hiro.so/extended/v1/status');
+        const data = await response.json();
+        
         setStats({
-          totalTransactions: statsData.totalTransactions,
-          activeUsers: statsData.activeUsers,
-          totalValue: statsData.totalValue,
-          avgBlockTime: statsData.avgBlockTime,
-          currentStxPrice: statsData.currentStxPrice,
-          totalStxSupply: statsData.totalStxSupply
+          totalTransactions: data.tx_count || 0,
+          activeUsers: 0, // Not directly available
+          totalValue: 0, // Calculate from STX price if needed
+          avgBlockTime: 600, // ~10 minutes for Stacks
+          currentStxPrice: 0, // Would need external price API
+          totalStxSupply: 0 // Not directly available in status endpoint
         });
 
         // Fetch account balance if connected
         if (isConnected && address) {
-          const balance = await fetchAccountBalance(address);
-          setAccountBalance(balance);
+          const balanceResponse = await fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/balances`);
+          const balanceData = await balanceResponse.json();
+          setAccountBalance(parseInt(balanceData.stx.balance) / 1000000); // Convert microSTX to STX
         }
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -61,7 +55,7 @@ export default function Dashboard() {
     };
 
     fetchStats();
-  }, [isConnected, address, fetchBlockchainStats, fetchAccountBalance]);
+  }, [isConnected, address]);
 
   interface StatCardProps {
     title: string;
@@ -108,21 +102,7 @@ export default function Dashboard() {
             >
               Back to App
             </Link>
-            {isConnected ? (
-              <button
-                onClick={disconnectWallet}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                Disconnect Wallet
-              </button>
-            ) : (
-              <button
-                onClick={connectWallet}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                Connect Wallet
-              </button>
-            )}
+            <WalletConnectButton />
           </div>
         </div>
       </header>
@@ -273,22 +253,22 @@ export default function Dashboard() {
           <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <button 
               onClick={() => window.location.reload()}
-              disabled={loading}
+              disabled={isLoading}
               className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors ${
-                loading 
+                isLoading 
                   ? 'border-gray-200 dark:border-gray-700 cursor-not-allowed' 
                   : 'border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400'
               }`}
             >
               <div className={`p-3 rounded-full ${
-                loading ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-100 dark:bg-blue-900/50'
+                isLoading ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-100 dark:bg-blue-900/50'
               } text-blue-600 dark:text-blue-400`}>
-                <ArrowPathIcon className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} />
+                <ArrowPathIcon className={`h-6 w-6 ${isLoading ? 'animate-spin' : ''}`} />
               </div>
               <span className={`mt-2 text-sm font-medium ${
-                loading ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'
+                isLoading ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'
               }`}>
-                {loading ? 'Refreshing...' : 'Refresh Data'}
+                {isLoading ? 'Refreshing...' : 'Refresh Data'}
               </span>
             </button>
             <a 

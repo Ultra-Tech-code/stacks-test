@@ -2,10 +2,11 @@
 
 import { useWallet } from '../context/WalletContext';
 import VotingDApp from '../components/VotingDApp';
+import WalletConnectButton from '../components/WalletConnectButton';
 import Link from 'next/link';
 
 export default function VotingPage() {
-  const { isConnected, address, connectWallet, disconnectWallet } = useWallet();
+  const { isConnected } = useWallet();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6">
@@ -22,26 +23,7 @@ export default function VotingPage() {
               </Link>
             </div>
             
-            {isConnected ? (
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600 dark:text-gray-300">
-                  {address?.slice(0, 8)}...{address?.slice(-8)}
-                </span>
-                <button
-                  onClick={disconnectWallet}
-                  className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={connectWallet}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors"
-              >
-                Connect Wallet
-              </button>
-            )}
+            <WalletConnectButton />
           </nav>
 
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white text-center">
