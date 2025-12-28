@@ -188,10 +188,15 @@ export default function VotingDApp() {
         return;
       }
 
-      // Fetch current block height to verify poll status
-      const blockResponse = await fetch('https://api.hiro.so/v2/info');
+      // Fetch current block height to verify poll status via API route
+      const blockResponse = await fetch('/api/voting/block-info');
       const blockData = await blockResponse.json();
-      const currentBlock = blockData.stacks_tip_height;
+      
+      console.log('📦 Block Data Received:', blockData);
+      
+      const currentBlock = blockData.stacksTipHeight;
+
+      console.log('📊 Current Block Height:', currentBlock);
 
       const pollData: Poll[] = data.polls
         .map((pollResponse: any, index: number) => {
@@ -206,6 +211,19 @@ export default function VotingDApp() {
 
           // Check if poll has actually ended based on block height
           const isActuallyActive = parsed.isActive && parsed.endBlock > currentBlock;
+          const blocksRemaining = parsed.endBlock - currentBlock;
+          const daysRemaining = (blocksRemaining * 10) / (60 * 24); // 10 min per block
+
+          console.log(`\n🗳️ Poll #${index}:`, {
+            title: parsed.title,
+            endBlock: parsed.endBlock,
+            currentBlock,
+            blocksRemaining,
+            daysRemaining: daysRemaining.toFixed(2),
+            isActiveInContract: parsed.isActive,
+            isActuallyActive,
+            duration: `${blocksRemaining} blocks (~${daysRemaining.toFixed(1)} days)`
+          });
 
           return {
             pollId: index,

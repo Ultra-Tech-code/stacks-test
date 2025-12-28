@@ -41,8 +41,8 @@ export async function POST(request: Request) {
     
     // Parse Clarity uint from response
     // Format: 0x07 (response-ok) + 0x01 (uint) + 32 hex chars (16 bytes big-endian)
-    const result = countData.result;
-    const hexWithoutPrefix = result.replace('0x0701', '');
+    const clarityResult = countData.result;
+    const hexWithoutPrefix = clarityResult.replace('0x0701', '');
     const count = parseInt(hexWithoutPrefix, 16);
     
     if (count === 0) {
@@ -88,18 +88,18 @@ export async function POST(request: Request) {
       }
     }
     
-    const result = {
+    const responseData = {
       count,
       polls: pollResults
     };
     
     // Cache the result
     pollsCache = {
-      data: result,
+      data: responseData,
       timestamp: Date.now()
     };
     
-    return NextResponse.json(result);
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Failed to fetch all polls:', error);
     return NextResponse.json({ 

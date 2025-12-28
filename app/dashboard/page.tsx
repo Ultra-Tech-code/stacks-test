@@ -28,12 +28,12 @@ export default function Dashboard() {
       try {
         setIsLoading(true);
         
-        // Fetch blockchain stats from Stacks API
-        const response = await fetch('https://api.hiro.so/extended/v1/status');
+        // Fetch blockchain stats from our API route
+        const response = await fetch('/api/network/status');
         const data = await response.json();
         
         setStats({
-          totalTransactions: data.tx_count || 0,
+          totalTransactions: data.txCount || 0,
           activeUsers: 0, // Not directly available
           totalValue: 0, // Calculate from STX price if needed
           avgBlockTime: 600, // ~10 minutes for Stacks
@@ -43,9 +43,9 @@ export default function Dashboard() {
 
         // Fetch account balance if connected
         if (isConnected && address) {
-          const balanceResponse = await fetch(`https://api.hiro.so/extended/v1/address/${address}/balances`);
+          const balanceResponse = await fetch(`/api/network/balance?address=${address}`);
           const balanceData = await balanceResponse.json();
-          setAccountBalance(parseInt(balanceData.stx.balance) / 1000000); // Convert microSTX to STX
+          setAccountBalance(balanceData.stxBalance);
         }
       } catch (error) {
         console.error('Error fetching stats:', error);
