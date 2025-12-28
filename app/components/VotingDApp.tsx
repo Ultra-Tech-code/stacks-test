@@ -249,6 +249,25 @@ export default function VotingDApp() {
     }
   }, [isConnected, address, lastFetchTime]);
 
+  const clearCacheAndRefresh = useCallback(async () => {
+    try {
+      // Clear cache first
+      await fetch('/api/voting/clear-cache', { method: 'POST' });
+      console.log('🗑️ Cache cleared, fetching fresh data...');
+      
+      // Force fetch by resetting last fetch time
+      setLastFetchTime(0);
+      
+      // Small delay to ensure cache is cleared
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Fetch polls
+      await fetchPolls();
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  }, [fetchPolls]);
+
   // Fetch polls and user votes on initial load
   useEffect(() => {
     if (isConnected) {
@@ -362,12 +381,12 @@ export default function VotingDApp() {
         <div className="flex justify-between mb-4">
           <h2 className="text-2xl font-semibold">🗳️ Polls ({pollCount})</h2>
           <button 
-            onClick={() => fetchPolls()} 
+            onClick={() => clearCacheAndRefresh()} 
             disabled={loadingPolls} 
             className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded"
-            title="Load polls"
+            title="Clear cache and reload polls"
           >
-            {loadingPolls ? '⏳ Loading' : '🔄 Load Polls'}
+            {loadingPolls ? '⏳ Loading' : '🔄 Refresh Polls'}
           </button>
         </div>
 

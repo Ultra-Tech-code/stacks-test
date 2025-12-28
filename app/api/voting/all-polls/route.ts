@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 
 // Simple in-memory cache
 let pollsCache: { data: any; timestamp: number } | null = null;
-const CACHE_DURATION = 10000; // 10 seconds
+const CACHE_DURATION = 30000; // 30 seconds - increased to prevent rate limiting
+
+// Export function to clear cache
+export function clearPollsCache() {
+  pollsCache = null;
+}
 
 // Helper to add delay between requests
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -49,11 +54,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ polls: [], count: 0 });
     }
 
-    // Fetch polls with rate limiting (batches of 5 with delays)
+    // Skip first 55 ended polls, only fetch recent ones
+    const skipCount = 55; // Skip old ended polls
+    const startIndex = Math.max(0, count - 20); // Fetch last 20 polls only
+    const pollsToFetch = count - startIndex;
+
+    // Fetch polls with rate limiting (batches of 3 with delays)
     const pollResults = [];
-    const batchSize = 5;
+    const batchSize = 3; // Reduced from 5 to avoid rate limiting
     
-    for (let i = 0; i < count; i += batchSize) {
+    for (let i = startIndex; i < count; i += batchSize) {
       const batch = [];
       const end = Math.min(i + batchSize, count);
       
@@ -84,7 +94,7 @@ export async function POST(request: Request) {
       
       // Add delay between batches to avoid rate limiting
       if (end < count) {
-        await delay(1000); // 1 second delay between batches
+        await delay(2000); // 2 second delay between batches to avoid rate limiting
       }
     }
     
