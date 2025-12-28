@@ -1,8 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect } from '@reown/appkit/react'
-import '../config/appkit'
+import { AppConfig, UserSession, showConnect } from '@stacks/connect'
+import { StacksMainnet } from '@stacks/network'
 
 // Wallet Context type
 interface WalletContextType {
@@ -10,31 +10,52 @@ interface WalletContextType {
   isConnected: boolean
   connect: () => void
   disconnect: () => void
+  userSession: UserSession | null
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
+const appConfig = new AppConfig(['store_write', 'publish_data'])
+const userSession = new UserSession({ appConfig })
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false)
-  const { open } = useAppKit()
-  const { address, isConnected } = useAppKitAccount()
-  const { disconnect: appKitDisconnect } = useDisconnect()
+  const [address, setAddress] = useState<string | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
 
   // Set mounted state
   useEffect(() => {
     setMounted(true)
+    
+    // Check if user is already signed in
+    if (userSession.isUserSignedIn()) {
+      const userData = userSession.loadUserData()
+      setAddress(userData.profile.stxAddress.mainnet)
+      setIsConnected(true)
+    }
   }, [])
 
   const connect = () => {
-    open()
+    showConnect({
+      appDetails: {
+        name: 'Stacks Voting DApp',
+        icon: window.location.origin + '/icon.png',
+      },
+      redirectTo: '/',
+      onFinish: () => {
+        const userData = userSession.loadUserData()
+        setAddress(userData.profile.stxAddress.mainnet)
+        setIsConnected(true)
+      },
+      userSession,
+    })
   }
 
   const disconnect = async () => {
-    try {
-      await appKitDisconnect()
-    } catch (err) {
-      console.error('Disconnect error:', err)
-    }
+    userSession.signUserOut()
+    setAddress(null)
+    setIsConnected(false)
+    window.location.reload()
   }
 
   if (!mounted) {
@@ -44,7 +65,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           address: null,
           isConnected: false,
           connect: () => {},
-          disconnect: async () => {}
+          disconnect: async () => {},
+          userSession: null
         }}
       >
         {children}
@@ -55,10 +77,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   return (
     <WalletContext.Provider
       value={{
-        address: address || null,
-        isConnected: isConnected || false,
+        address,
+        isConnected,
         connect,
-        disconnect
+        disconnect,
+        userSession
       }}
     >
       {children}

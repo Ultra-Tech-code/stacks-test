@@ -8,12 +8,10 @@ import {
   makeContractCall, 
   broadcastTransaction, 
   AnchorMode,
-  PostConditionMode,
-  SignedContractCallOptions,
-  deserializeTransaction
+  PostConditionMode
 } from '@stacks/transactions';
 import { STACKS_MAINNET } from '@stacks/network';
-import { useAppKitProvider } from '@reown/appkit/react';
+import { openContractCall } from '@stacks/connect';
 import { useWallet } from './WalletContext';
 
 interface VotingContextType {
@@ -32,8 +30,7 @@ const CONTRACT_ADDRESS = 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX';
 const CONTRACT_NAME = 'Blackadam-Voting-Contract';
 
 export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { address, isConnected } = useWallet();
-  const { walletProvider } = useAppKitProvider('stacks');
+  const { address, isConnected, userSession } = useWallet();
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,50 +46,23 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Wallet not connected');
     }
 
-    if (!walletProvider) {
-      throw new Error('Wallet provider not available');
-    }
-
-    try {
-      // Build the transaction
-      const txOptions: SignedContractCallOptions = {
+    return new Promise<string>((resolve, reject) => {
+      openContractCall({
+        network: STACKS_MAINNET,
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName,
         functionArgs,
-        senderKey: address,
-        network: STACKS_MAINNET,
-        // anchorMode: AnchorMode.Any,
         postConditionMode: PostConditionMode.Allow,
-      };
-
-      const transaction = await makeContractCall(txOptions);
-      
-      // Type assertion for walletProvider
-      const provider = walletProvider as any;
-      
-      // Request signature from wallet via AppKit
-      const result = await provider.request({
-        method: 'stacks_signTransaction',
-        params: {
-          transaction: transaction.serialize().toString()
-        }
+        onFinish: (data) => {
+          resolve(data.txId);
+        },
+        onCancel: () => {
+          reject(new Error('Transaction canceled by user'));
+        },
       });
-      // Broadcast the signed transaction
-      const txBuffer = Buffer.from(result.transaction, 'hex');
-      const signedTx = deserializeTransaction(result.transaction);
-      const broadcastResponse = await broadcastTransaction({
-        transaction: signedTx,
-        network: STACKS_MAINNET
-      });
-   
-      
-      return broadcastResponse.txid;
-    } catch (err) {
-      console.error('Transaction error:', err);
-      throw err;
-    }
-  }, [isConnected, address, walletProvider]);
+    });
+  }, [isConnected, address]);
 
   const createPoll = useCallback(async (title: string, description: string, duration: number) => {
     if (!isConnected || !address) {
