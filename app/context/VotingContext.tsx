@@ -12,7 +12,7 @@ import {
   SignedContractCallOptions,
   deserializeTransaction
 } from '@stacks/transactions';
-import { STACKS_TESTNET } from '@stacks/network';
+import { STACKS_MAINNET } from '@stacks/network';
 import { useAppKitProvider } from '@reown/appkit/react';
 import { useWallet } from './WalletContext';
 
@@ -28,8 +28,8 @@ interface VotingContextType {
 
 const VotingContext = createContext<VotingContextType | undefined>(undefined);
 
-const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
-const CONTRACT_NAME = 'Blackadam-vote-contract';
+const CONTRACT_ADDRESS = 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX';
+const CONTRACT_NAME = 'Blackadam-Voting-Contract';
 
 export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { address, isConnected } = useWallet();
@@ -61,7 +61,7 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         functionName,
         functionArgs,
         senderKey: address,
-        network: STACKS_TESTNET,
+        network: STACKS_MAINNET,
         // anchorMode: AnchorMode.Any,
         postConditionMode: PostConditionMode.Allow,
       };
@@ -83,7 +83,7 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const signedTx = deserializeTransaction(result.transaction);
       const broadcastResponse = await broadcastTransaction({
         transaction: signedTx,
-        network: STACKS_TESTNET
+        network: STACKS_MAINNET
       });
    
       

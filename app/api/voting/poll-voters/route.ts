@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     const numericPollId = typeof pollId === 'number' ? pollId : Number(pollId);
-    const contractId = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G.Blackadam-vote-contract';
+    const contractId = 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX.Blackadam-Voting-Contract';
 
     interface Voter {
       address: string;
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     // Fetch transactions calling the contract (not just from deployer address)
     while (hasMore && offset < 200) { // Limit to 4 pages max (200 transactions)
-      const url = `https://api.testnet.hiro.so/extended/v1/address/${contractId}/transactions?limit=${limit}&offset=${offset}`;
+      const url = `https://api.hiro.so/extended/v1/address/${contractId}/transactions?limit=${limit}&offset=${offset}`;
       console.log('Fetching from URL:', url);
       
       const response = await fetch(url, {

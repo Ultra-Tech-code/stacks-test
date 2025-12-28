@@ -11,21 +11,6 @@ if (!projectId) {
 }
 
 // Define Stacks networks using CustomCaipNetwork format
-export const stacksTestnet: CustomCaipNetwork<'stacks'> = {
-  id: 2147483648,
-  chainNamespace: 'stacks' as const,
-  caipNetworkId: 'stacks:testnet',
-  name: 'Stacks Testnet',
-  nativeCurrency: {
-    name: 'STX',
-    symbol: 'STX',
-    decimals: 6
-  },
-  rpcUrls: {
-    default: { http: ['https://api.testnet.hiro.so'] }
-  }
-}
-
 export const stacksMainnet: CustomCaipNetwork<'stacks'> = {
   id: 1,
   chainNamespace: 'stacks' as const,
@@ -41,6 +26,21 @@ export const stacksMainnet: CustomCaipNetwork<'stacks'> = {
   }
 }
 
+export const stacksTestnet: CustomCaipNetwork<'stacks'> = {
+  id: 2147483648,
+  chainNamespace: 'stacks' as const,
+  caipNetworkId: 'stacks:testnet',
+  name: 'Stacks Testnet',
+  nativeCurrency: {
+    name: 'STX',
+    symbol: 'STX',
+    decimals: 6
+  },
+  rpcUrls: {
+    default: { http: ['https://api.testnet.hiro.so'] }
+  }
+}
+
 // Metadata for AppKit
 const metadata = {
   name: 'Stacks Voting DApp',
@@ -52,7 +52,7 @@ const metadata = {
 // Create and configure AppKit
 createAppKit({
   projectId,
-  networks: [stacksTestnet as CustomCaipNetwork, stacksMainnet as CustomCaipNetwork],
+  networks: [stacksMainnet as CustomCaipNetwork, stacksTestnet as CustomCaipNetwork],
   metadata,
   features: {
     analytics: true,

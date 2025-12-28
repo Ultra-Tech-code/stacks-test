@@ -29,7 +29,7 @@ export default function Dashboard() {
         setIsLoading(true);
         
         // Fetch blockchain stats from Stacks API
-        const response = await fetch('https://api.testnet.hiro.so/extended/v1/status');
+        const response = await fetch('https://api.hiro.so/extended/v1/status');
         const data = await response.json();
         
         setStats({
@@ -43,7 +43,7 @@ export default function Dashboard() {
 
         // Fetch account balance if connected
         if (isConnected && address) {
-          const balanceResponse = await fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/balances`);
+          const balanceResponse = await fetch(`https://api.hiro.so/extended/v1/address/${address}/balances`);
           const balanceData = await balanceResponse.json();
           setAccountBalance(parseInt(balanceData.stx.balance) / 1000000); // Convert microSTX to STX
         }
@@ -272,7 +272,7 @@ export default function Dashboard() {
               </span>
             </button>
             <a 
-              href="https://explorer.stacks.co/?chain=testnet" 
+              href="https://explorer.stacks.co/?chain=mainnet" 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 dark:hover:border-green-400 transition-colors"

@@ -52,16 +52,16 @@ npm run dev
 
 ### Contract Details
 
-The voting contract is deployed on Stacks Testnet:
-- **Contract Address**: `ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G`
-- **Contract Name**: `Blackadam-vote-contract`
+The voting contract is deployed on Stacks Mainnet:
+- **Contract Address**: `SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX`
+- **Contract Name**: `Blackadam-Voting-Contract`
 
 Configuration is located in `app/context/VotingContext.tsx`:
 
 ```typescript
-const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
-const CONTRACT_NAME = 'Blackadam-vote-contract';
-const NETWORK = STACKS_TESTNET;
+const CONTRACT_ADDRESS = 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX';
+const CONTRACT_NAME = 'Blackadam-Voting-Contract';
+const NETWORK = STACKS_MAINNET;
 ```
 
 ## 📖 Usage
@@ -281,10 +281,10 @@ The wallet connection persists across page refreshes.
 
 ## 🌐 Network Information
 
-- **Network**: Stacks Testnet
-- **Contract Address**: `ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G`
-- **Contract Name**: `blonde-peach-tern`
-- **Explorer**: [Stacks Testnet Explorer](https://explorer.hiro.so/?chain=testnet)
+- **Network**: Stacks Mainnet
+- **Contract Address**: `SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX`
+- **Contract Name**: `Blackadam-Voting-Contract`
+- **Explorer**: [Stacks Explorer](https://explorer.hiro.so/?chain=mainnet)
 
 ## 🏗️ Build for Production
 

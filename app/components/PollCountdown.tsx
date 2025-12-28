@@ -14,7 +14,7 @@ export default function PollCountdown({ endBlock, isActive }: PollCountdownProps
   useEffect(() => {
     const fetchCurrentBlock = async () => {
       try {
-        const response = await fetch('https://api.testnet.hiro.so/v2/info');
+        const response = await fetch('https://api.hiro.so/v2/info');
         const data = await response.json();
         setCurrentBlock(data.stacks_tip_height);
       } catch (error) {

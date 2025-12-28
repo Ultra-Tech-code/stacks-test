@@ -27,6 +27,7 @@ export default function VotingDApp() {
   const [loadingPolls, setLoadingPolls] = useState(false);
   const [votedPolls, setVotedPolls] = useState<Set<number>>(new Set());
   const [selectedPoll, setSelectedPoll] = useState<{ id: number; title: string; contractYesVotes: number; contractNoVotes: number } | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -40,8 +41,8 @@ export default function VotingDApp() {
 
   // Connect to WebSocket
   const { isConnected: wsConnected, error: wsError } = useStacksWebSocket({
-    contractAddress: 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G',
-    contractName: 'Blackadam-vote-contract',
+    contractAddress: 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX',
+    contractName: 'Blackadam-Voting-Contract',
     onEvent: handleWebSocketEvent,
     autoConnect: true
   });
@@ -153,6 +154,14 @@ export default function VotingDApp() {
   const fetchPolls = useCallback(async () => {
     if (!isConnected) return;
     
+    // Debounce: Don't fetch if we fetched less than 5 seconds ago
+    const now = Date.now();
+    if (now - lastFetchTime < 5000) {
+      console.log('Skipping fetch - too soon since last fetch');
+      return;
+    }
+    setLastFetchTime(now);
+    
     setLoadingPolls(true);
     try {
       const response = await fetch('/api/voting/all-polls', {
@@ -180,7 +189,7 @@ export default function VotingDApp() {
       }
 
       // Fetch current block height to verify poll status
-      const blockResponse = await fetch('https://api.testnet.hiro.so/v2/info');
+      const blockResponse = await fetch('https://api.hiro.so/v2/info');
       const blockData = await blockResponse.json();
       const currentBlock = blockData.stacks_tip_height;
 
@@ -220,7 +229,7 @@ export default function VotingDApp() {
     } finally {
       setLoadingPolls(false);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, lastFetchTime]);
 
   // Fetch polls and user votes on initial load
   useEffect(() => {

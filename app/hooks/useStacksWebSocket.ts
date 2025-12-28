@@ -44,7 +44,7 @@ export function useStacksWebSocket({
 
       try {
         // Connect to Stacks testnet WebSocket
-        const client = await connectWebSocketClient('wss://api.testnet.hiro.so/');
+        const client = await connectWebSocketClient('wss://api.hiro.so/');
         
         if (!mounted) {
           return;

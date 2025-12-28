@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server';
 
+// Simple in-memory cache
+let pollsCache: { data: any; timestamp: number } | null = null;
+const CACHE_DURATION = 10000; // 10 seconds
+
+// Helper to add delay between requests
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function POST(request: Request) {
+  // Check cache first
+  if (pollsCache && Date.now() - pollsCache.timestamp < CACHE_DURATION) {
+    return NextResponse.json(pollsCache.data);
+  }
   try {
     const { sender } = await request.json();
     
     // Get poll count first
     const countResponse = await fetch(
-      'https://api.testnet.hiro.so/v2/contracts/call-read/ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G/Blackadam-vote-contract/get-poll-count',
+      'https://api.hiro.so/v2/contracts/call-read/SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX/Blackadam-Voting-Contract/get-poll-count',
       {
         method: 'POST',
         headers: { 
@@ -14,7 +25,7 @@ export async function POST(request: Request) {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          sender: sender || 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G',
+          sender: sender || 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX',
           arguments: [],
         }),
       }
@@ -38,36 +49,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ polls: [], count: 0 });
     }
 
-    // Fetch all polls in parallel
-    const pollPromises = [];
-    for (let i = 0; i < count; i++) {
-      const pollIdHex = i.toString(16).padStart(32, '0');
-      const clarityUint = `0x01${pollIdHex}`;
-      
-      pollPromises.push(
-        fetch(
-          'https://api.testnet.hiro.so/v2/contracts/call-read/ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G/Blackadam-vote-contract/get-poll',
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              sender: sender || 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G',
-              arguments: [clarityUint],
-            }),
-          }
-        ).then(res => res.json()).catch(err => ({ error: err.message, pollId: i }))
-      );
-    }
-
-    const pollResults = await Promise.all(pollPromises);
+    // Fetch polls with rate limiting (batches of 5 with delays)
+    const pollResults = [];
+    const batchSize = 5;
     
-    return NextResponse.json({
+    for (let i = 0; i < count; i += batchSize) {
+      const batch = [];
+      const end = Math.min(i + batchSize, count);
+      
+      for (let j = i; j < end; j++) {
+        const pollIdHex = j.toString(16).padStart(32, '0');
+        const clarityUint = `0x01${pollIdHex}`;
+        
+        batch.push(
+          fetch(
+            'https://api.hiro.so/v2/contracts/call-read/SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX/Blackadam-Voting-Contract/get-poll',
+            {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                sender: sender || 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX',
+                arguments: [clarityUint],
+              }),
+            }
+          ).then(res => res.json()).catch(err => ({ error: err.message, pollId: j }))
+        );
+      }
+      
+      const batchResults = await Promise.all(batch);
+      pollResults.push(...batchResults);
+      
+      // Add delay between batches to avoid rate limiting
+      if (end < count) {
+        await delay(1000); // 1 second delay between batches
+      }
+    }
+    
+    const result = {
       count,
       polls: pollResults
-    });
+    };
+    
+    // Cache the result
+    pollsCache = {
+      data: result,
+      timestamp: Date.now()
+    };
+    
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Failed to fetch all polls:', error);
     return NextResponse.json({ 

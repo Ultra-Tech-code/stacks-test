@@ -1,7 +1,7 @@
 // Browser-safe utilities for chainhooks
 // Note: ChainhooksClient is server-side only, moved to API routes
 
-const CONTRACT_ADDRESS = 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G';
+const CONTRACT_ADDRESS = 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX';
 const CONTRACT_NAME = 'blonde-peach-tern';
 
 /**
@@ -33,7 +33,7 @@ export interface ContractEvent {
 export async function fetchContractTransactions(limit: number = 20): Promise<ContractEvent[]> {
   try {
     const response = await fetch(
-      `https://api.testnet.hiro.so/extended/v1/address/${CONTRACT_ADDRESS}/transactions?limit=${limit}`
+      `https://api.hiro.so/extended/v1/address/${CONTRACT_ADDRESS}/transactions?limit=${limit}`
     );
     
     if (!response.ok) {

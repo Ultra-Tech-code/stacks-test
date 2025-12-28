@@ -99,11 +99,11 @@ export default function Home() {
             <div className="space-y-2 text-sm">
               <p>
                 <span className="font-medium text-gray-700 dark:text-gray-300">Contract Address: </span>
-                <span className="font-mono text-gray-600 dark:text-gray-400">ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G</span>
+                <span className="font-mono text-gray-600 dark:text-gray-400">SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX</span>
               </p>
               <p>
                 <span className="font-medium text-gray-700 dark:text-gray-300">Contract Name: </span>
-                <span className="font-mono text-gray-600 dark:text-gray-400">Blackadam-vote-contract</span>
+                <span className="font-mono text-gray-600 dark:text-gray-400">Blackadam-Voting-Contract</span>
               </p>
               <p>
                 <span className="font-medium text-gray-700 dark:text-gray-300">Network: </span>

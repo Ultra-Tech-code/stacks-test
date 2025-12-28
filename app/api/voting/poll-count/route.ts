@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const { sender } = await request.json();
     
     const response = await fetch(
-      'https://api.testnet.hiro.so/v2/contracts/call-read/ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G/Blackadam-vote-contract/get-poll-count',
+      'https://api.hiro.so/v2/contracts/call-read/SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX/Blackadam-Voting-Contract/get-poll-count',
       {
         method: 'POST',
         headers: { 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          sender: sender || 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G',
+          sender: sender || 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX',
           arguments: [],
         }),
       }

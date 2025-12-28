@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server';
 
+// Simple in-memory cache for user votes
+const votesCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 15000; // 15 seconds
+
 export async function POST(request: Request) {
+  const { address } = await request.json();
+  
+  // Check cache first
+  const cached = votesCache.get(address);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return NextResponse.json(cached.data);
+  }
+  
   try {
-    const { address } = await request.json();
-    
     if (!address) {
       return NextResponse.json({ error: 'Address required' }, { status: 400 });
     }
 
     // Fetch transactions for the user's address
     const response = await fetch(
-      `https://api.testnet.hiro.so/extended/v1/address/${address}/transactions?limit=50`,
+      `https://api.hiro.so/extended/v1/address/${address}/transactions?limit=50`,
       {
         method: 'GET',
         headers: { 
@@ -35,7 +45,7 @@ export async function POST(request: Request) {
         // Check if it's a contract call to our voting contract
         if (
           tx.tx_type === 'contract_call' &&
-          tx.contract_call?.contract_id === 'ST33Y8RCP74098JCSPW5QHHCD6QN4H3XS9E4PVW1G.Blackadam-vote-contract' &&
+          tx.contract_call?.contract_id === 'SP33Y8RCP74098JCSPW5QHHCD6QN4H3XS9DM3QXXX.Blackadam-Voting-Contract' &&
           tx.contract_call?.function_name === 'vote' &&
           tx.tx_status === 'success'
         ) {
@@ -54,9 +64,15 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({
-      votedPolls: Array.from(votedPolls)
+    const result = { votedPolls: Array.from(votedPolls) };
+    
+    // Cache the result
+    votesCache.set(address, {
+      data: result,
+      timestamp: Date.now()
     });
+    
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Failed to fetch user votes:', error);
     return NextResponse.json({ 
