@@ -213,6 +213,11 @@ export default function VotingDApp() {
           const isActuallyActive = parsed.isActive && parsed.endBlock > currentBlock;
           const blocksRemaining = parsed.endBlock - currentBlock;
           const daysRemaining = (blocksRemaining * 10) / (60 * 24); // 10 min per block
+          
+          // Calculate when poll was created (approximately)
+          // We don't have creation block, so we estimate from remaining time
+          const blocksPassed = Math.abs(Math.min(0, blocksRemaining)); // How many blocks since it ended
+          const creationBlock = parsed.endBlock - (parsed.endBlock - currentBlock) - blocksPassed;
 
           console.log(`\n🗳️ Poll #${index}:`, {
             title: parsed.title,
@@ -222,7 +227,11 @@ export default function VotingDApp() {
             daysRemaining: daysRemaining.toFixed(2),
             isActiveInContract: parsed.isActive,
             isActuallyActive,
-            duration: `${blocksRemaining} blocks (~${daysRemaining.toFixed(1)} days)`
+            status: blocksRemaining > 0 ? '✅ ACTIVE' : '❌ ENDED',
+            timeLeft: blocksRemaining > 0 
+              ? `${blocksRemaining} blocks (~${daysRemaining.toFixed(1)} days)` 
+              : `Ended ${Math.abs(blocksRemaining)} blocks ago (~${Math.abs(daysRemaining).toFixed(1)} days ago)`,
+            note: blocksRemaining < 0 ? 'Poll has already ended - it was likely created with a short duration' : ''
           });
 
           return {
@@ -237,7 +246,9 @@ export default function VotingDApp() {
           };
         })
         .filter((poll: Poll | null): poll is Poll => poll !== null)
-        .reverse();
+        .reverse(); // Newest polls first
+      
+      console.log(`📋 Loaded ${pollData.length} polls. First poll ID: ${pollData[0]?.pollId}, Last poll ID: ${pollData[pollData.length - 1]?.pollId}`);
       
       setPolls(pollData);
     } catch (error) {
@@ -283,6 +294,13 @@ export default function VotingDApp() {
     }
     
     const blocks = Math.floor(parseFloat(days) * 144);
+    console.log('🔨 Creating poll with:', {
+      title,
+      description,
+      daysInput: days,
+      blocksCalculated: blocks,
+      expectedDuration: `${blocks} blocks = ${(blocks / 144).toFixed(1)} days`
+    });
     await createPoll(title, description, blocks);
     setTitle('');
     setDescription('');
@@ -357,15 +375,26 @@ export default function VotingDApp() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Days</label>
+            <label className="block text-sm font-medium mb-2">
+              Poll Duration (in days)
+              {days && parseFloat(days) > 0 && (
+                <span className="ml-2 text-green-600 dark:text-green-400 font-semibold text-sm">
+                  ✓ {parseFloat(days)} days
+                </span>
+              )}
+            </label>
             <input
               type="number"
               value={days}
               onChange={(e) => setDays(e.target.value)}
-              min="0.01"
-              step="0.1"
-              className="w-full px-4 py-2 border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              min="1"
+              step="1"
+              className="w-full px-4 py-2 border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg"
+              placeholder="30"
             />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Recommended: 30 days (one month) or 60 days (two months)
+            </p>
           </div>
           <button
             onClick={handleCreate}
@@ -411,6 +440,11 @@ export default function VotingDApp() {
                     title="Click to view voters"
                   >
                     <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 px-2 py-0.5 rounded">
+                          Poll #{poll.pollId}
+                        </span>
+                      </div>
                       <h3 className="text-lg font-semibold">{poll.title}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{poll.description}</p>
                     </div>

@@ -54,14 +54,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ polls: [], count: 0 });
     }
 
-    // Skip first 55 ended polls, only fetch recent ones
-    const skipCount = 55; // Skip old ended polls
-    const startIndex = Math.max(0, count - 20); // Fetch last 20 polls only
-    const pollsToFetch = count - startIndex;
+    console.log(`📊 Total poll count: ${count}`);
+    
+    // Fetch polls in REVERSE order (newest first) - last 30 polls
+    const maxToFetch = Math.min(count, 30);
+    const startIndex = Math.max(0, count - maxToFetch);
 
-    // Fetch polls with rate limiting (batches of 3 with delays)
+    console.log(`📥 Fetching polls ${startIndex} to ${count - 1} (${maxToFetch} total)`);
+
+    // Fetch polls with rate limiting (batches of 5 with delays)
     const pollResults = [];
-    const batchSize = 3; // Reduced from 5 to avoid rate limiting
+    const batchSize = 5;
     
     for (let i = startIndex; i < count; i += batchSize) {
       const batch = [];

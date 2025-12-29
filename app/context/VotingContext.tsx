@@ -75,6 +75,13 @@ export const VotingProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSuccess(null);
 
     try {
+      console.log('📤 Sending to contract - create-poll:', {
+        title,
+        description,
+        duration,
+        durationInDays: (duration / 144).toFixed(1)
+      });
+      
       const txId = await signAndBroadcast('create-poll', [
         stringAsciiCV(title),
         stringAsciiCV(description),
